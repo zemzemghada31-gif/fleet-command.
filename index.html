@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet Command — Fleet Management Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #F5F6FA;
+      color: #1A1D2E;
+      min-width: 1280px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    /* ===== LAYOUT ===== */
+    .app-wrapper {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: 130px;
+      min-width: 130px;
+      background: #1B2033;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .sidebar-brand {
+      padding: 20px 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: #fff;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-icon i { color: #1B2033; font-size: 13px; }
+
+    .brand-name {
+      color: #fff;
+      font-weight: 700;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .brand-sub {
+      color: #6B7280;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding-left: 36px;
+      margin-top: 2px;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 14px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      list-style: none;
+    }
+
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 9px 8px;
+      margin: 0 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: rgba(255,255,255,0.55);
+      font-size: 10px;
+      font-weight: 500;
+      text-align: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .nav-item i { font-size: 16px; }
+
+    .nav-item:hover { color: #fff; background: rgba(255,255,255,0.07); }
+
+    .nav-item.active { background: #fff; color: #1B2033; }
+    .nav-item.active i { color: #1B2033; }
+
+    .sidebar-bottom {
+      padding: 10px 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* ===== TOP BAR ===== */
+    .topbar {
+      background: #fff;
+      border-bottom: 1px solid #E8EAF0;
+      padding: 0 28px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 100;
+    }
+
+    .topbar-title {
+      font-weight: 700;
+      font-size: 17px;
+      color: #1A1D2E;
+      white-space: nowrap;
+    }
+
+    .topbar-tabs {
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+
+    .topbar-tab {
+      padding: 0 18px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: #8A8FA8;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .topbar-tab:hover { color: #1A1D2E; }
+    .topbar-tab.active { color: #1A1D2E; border-bottom-color: #1B2033; font-weight: 600; }
+
+    .topbar-spacer { flex: 1; }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+    }
+
+    .topbar-icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #64748B;
+      font-size: 16px;
+      transition: background 0.15s;
+      position: relative;
+    }
+
+    .topbar-icon-btn:hover { background: #F1F5F9; }
+
+    .notif-dot-badge {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      width: 8px;
+      height: 8px;
+      background: #EF4444;
+      border-radius: 50%;
+      border: 1.5px solid #fff;
+    }
+
+    .topbar-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #1B2033;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      user-select: none;
+      transition: opacity 0.15s;
+      position: relative;
+    }
+
+    .topbar-avatar:hover { opacity: 0.85; }
+
+    /* ===== DROPDOWNS ===== */
+    .dropdown-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+      z-index: 500;
+      min-width: 240px;
+      display: none;
+    }
+
+    .dropdown-panel.open { display: block; animation: fadeIn 0.15s ease; }
+
+    .notif-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 11px 16px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .nd {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+      transition: opacity 0.3s;
+    }
+
+    .nd.red { background: #EF4444; }
+    .nd.orange { background: #F59E0B; }
+    .nd.blue { background: #3B82F6; }
+    .nd.read { opacity: 0; }
+
+    .notif-text-wrap { flex: 1; }
+    .notif-msg { font-size: 12px; color: #1A1D2E; }
+    .notif-ago { font-size: 10px; color: #8A8FA8; margin-top: 1px; }
+
+    .notif-footer {
+      padding: 8px 16px;
+      text-align: right;
+    }
+
+    .notif-footer a {
+      font-size: 11px;
+      color: #3B82F6;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .notif-footer a:hover { text-decoration: underline; }
+
+    .avatar-dropdown { min-width: 180px; }
+
+    .avatar-dd-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .avatar-dd-name { font-weight: 700; font-size: 13px; color: #1A1D2E; }
+    .avatar-dd-role { font-size: 11px; color: #8A8FA8; }
+
+    .avatar-dd-link {
+      display: block;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #1A1D2E;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .avatar-dd-link:hover { background: #F8FAFC; }
+    .avatar-dd-link.danger { color: #EF4444; }
+
+    /* ===== PAGE SCROLL ===== */
+    .page-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px 28px;
+    }
+
+    .scheduling-placeholder {
+      background: #fff;
+      border-radius: 10px;
+      padding: 60px 48px;
+      text-align: center;
+      color: #8A8FA8;
+      font-size: 15px;
+      border: 1px solid #E8EAF0;
+    }
+
+    /* ===== VEHICLE HEADER ===== */
+    .vehicle-header {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 0;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border: 1px solid #E8EAF0;
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+    }
+
+    .vehicle-img-block { flex-shrink: 0; }
+
+    .vehicle-img-placeholder {
+      width: 180px;
+      height: 110px;
+      background: #D1D5DB;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 6px;
+      color: #9CA3AF;
+      font-size: 11px;
+    }
+
+    .vehicle-img-placeholder i { font-size: 26px; }
+
+    .vehicle-id-pill {
+      display: block;
+      text-align: center;
+      margin-top: 8px;
+      background: #1A1D2E;
+      color: #fff;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .vehicle-info { flex: 1; }
+
+    .vehicle-name {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1A1D2E;
+      margin-bottom: 6px;
+    }
+
+    .vehicle-meta {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: #8A8FA8;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .vehicle-meta span { display: flex; align-items: center; gap: 5px; }
+
+    .vehicle-badges { display: flex; align-items: center; gap: 14px; }
+
+    .miles-text { font-size: 12px; color: #8A8FA8; }
+
+    .vehicle-stat-cards { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+
+    .stat-card {
+      background: #F8FAFC;
+      border-radius: 8px;
+      padding: 12px 16px;
+      min-width: 152px;
+      cursor: pointer;
+      transition: box-shadow 0.15s, background 0.15s;
+      border: 1px solid #E8EAF0;
+    }
+
+    .stat-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); background: #F1F5F9; }
+
+    .stat-card-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: #8A8FA8;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 4px;
+    }
+
+    .stat-card-value { font-size: 22px; font-weight: 700; color: #1A1D2E; }
+    .stat-card-value.red { color: #C0392B; }
+    .stat-card-sub { font-size: 10px; color: #8A8FA8; margin-top: 2px; }
+
+    /* ===== BADGES ===== */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 11px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: default;
+      user-select: none;
+      transition: all 0.15s;
+    }
+
+    .badge.clickable { cursor: pointer; }
+    .badge-green { background: #E6F9F0; color: #1A9E5C; }
+    .badge-grey { background: #F1F5F9; color: #8A8FA8; }
+    .badge-orange { background: #FFF4E5; color: #D97706; }
+    .badge-red { background: #FDECEA; color: #C0392B; }
+    .badge-red-solid { background: #C0392B; color: #fff; }
+    .badge-blue { background: #EFF6FF; color: #2563EB; }
+
+    /* ===== SECONDARY TABS ===== */
+    .secondary-tabs {
+      display: flex;
+      background: #fff;
+      border-left: 1px solid #E8EAF0;
+      border-right: 1px solid #E8EAF0;
+      border-bottom: 2px solid #E8EAF0;
+      padding: 0 20px;
+      margin-bottom: 18px;
+    }
+
+    .sec-tab {
+      padding: 13px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #8A8FA8;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .sec-tab:hover { color: #1A1D2E; }
+    .sec-tab.active { color: #1A1D2E; border-bottom-color: #1B2033; font-weight: 600; }
+
+    /* ===== THREE COLUMN GRID ===== */
+    .three-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: auto auto;
+      grid-template-areas:
+        "c1 c2 c3"
+        "c1 banner banner";
+      gap: 16px;
+      align-items: start;
+    }
+
+    .col1-wrap { grid-area: c1; }
+    .col2-wrap { grid-area: c2; }
+    .col3-wrap { grid-area: c3; }
+
+    /* ===== SECTION CARD ===== */
+    .section-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 18px;
+      border: 1px solid #E8EAF0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-title { font-size: 14px; font-weight: 700; color: #1A1D2E; }
+
+    /* ===== TIMELINE ===== */
+    .timeline { display: flex; flex-direction: column; }
+
+    .timeline-entry {
+      display: flex;
+      gap: 12px;
+      padding-bottom: 18px;
+      position: relative;
+    }
+
+    .timeline-entry:last-child { padding-bottom: 0; }
+
+    .timeline-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 14px;
+      flex-shrink: 0;
+    }
+
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .timeline-dot.blue { background: #3B82F6; }
+    .timeline-dot.orange { background: #F59E0B; }
+    .timeline-dot.green { background: #22C55E; }
+
+    .timeline-line { width: 2px; flex: 1; background: #E8EAF0; margin-top: 4px; min-height: 20px; }
+
+    .timeline-content {
+      flex: 1;
+      background: #F8FAFC;
+      border-radius: 8px;
+      padding: 12px 14px;
+      border: 1px solid #E8EAF0;
+      position: relative;
+    }
+
+    .timeline-date-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding-right: 28px;
+    }
+
+    .timeline-date { font-size: 10px; font-weight: 600; color: #8A8FA8; letter-spacing: 0.05em; }
+
+    .entry-title { font-size: 12px; font-weight: 700; color: #1A1D2E; margin-bottom: 6px; }
+    .entry-desc { font-size: 11px; color: #64748B; line-height: 1.55; margin-bottom: 8px; }
+
+    .file-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #3B82F6;
+      font-size: 11px;
+      cursor: pointer;
+      font-weight: 500;
+      background: none;
+      border: none;
+    }
+
+    .file-link:hover { text-decoration: underline; }
+
+    .entry-menu-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #8A8FA8;
+      font-size: 14px;
+      transition: background 0.1s;
+      user-select: none;
+    }
+
+    .entry-menu-btn:hover { background: #E8EAF0; color: #1A1D2E; }
+
+    .entry-dropdown {
+      position: absolute;
+      top: 32px;
+      right: 6px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.13);
+      z-index: 200;
+      min-width: 110px;
+      display: none;
+    }
+
+    .entry-dropdown.open { display: block; animation: fadeIn 0.12s ease; }
+
+    .entry-dd-item {
+      padding: 9px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #1A1D2E;
+      transition: background 0.1s;
+    }
+
+    .entry-dd-item:first-child { border-radius: 8px 8px 0 0; }
+    .entry-dd-item:last-child { border-radius: 0 0 8px 8px; }
+    .entry-dd-item:hover { background: #F8FAFC; }
+    .entry-dd-item.danger { color: #EF4444; }
+
+    /* ===== ENGINE CARD ===== */
+    .engine-card {
+      border: 1px solid #E8EAF0;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .engine-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .engine-title { font-size: 13px; font-weight: 700; color: #1A1D2E; }
+    .engine-sub { font-size: 10px; color: #8A8FA8; margin-top: 2px; }
+
+    .wrench-btn {
+      cursor: pointer;
+      color: #8A8FA8;
+      font-size: 14px;
+      padding: 5px;
+      border-radius: 6px;
+      transition: background 0.1s, color 0.1s;
+      flex-shrink: 0;
+    }
+
+    .wrench-btn:hover { background: #F1F5F9; color: #1A1D2E; }
+
+    .engine-temp-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; margin-bottom: 4px; }
+    .engine-temp { font-size: 36px; font-weight: 700; color: #1A1D2E; line-height: 1; }
+
+    .sparkline-wrap {
+      background: #F8FAFC;
+      border-radius: 6px;
+      margin-top: 10px;
+      overflow: hidden;
+      height: 52px;
+      border: 1px solid #E8EAF0;
+    }
+
+    /* ===== METRIC ROWS ===== */
+    .metric-rows { display: flex; flex-direction: column; gap: 10px; }
+
+    .metric-row {
+      cursor: pointer;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #E8EAF0;
+      transition: background 0.15s;
+    }
+
+    .metric-row:hover { background: #F8FAFC; }
+
+    .metric-row-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .metric-label { font-size: 10px; font-weight: 700; color: #8A8FA8; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .metric-right { display: flex; align-items: center; gap: 8px; }
+    .metric-value { font-size: 14px; font-weight: 700; color: #1A1D2E; }
+
+    .metric-change {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+
+    .metric-change.red { background: #FDECEA; color: #C0392B; }
+    .metric-change.orange { background: #FFF4E5; color: #D97706; }
+    .metric-change.green { background: #E6F9F0; color: #1A9E5C; }
+
+    .metric-tiny { font-size: 10px; color: #8A8FA8; margin-top: 1px; margin-bottom: 4px; }
+
+    .progress-bg { height: 5px; background: #E8EAF0; border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; }
+    .fill-navy { background: #1B2033; }
+    .fill-orange { background: #F59E0B; }
+    .fill-green { background: #1A9E5C; }
+
+    /* ===== DTC CARD ===== */
+    .dtc-card {
+      border: 1px solid #E8EAF0;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .dtc-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .dtc-info-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #8A8FA8;
+      font-size: 15px;
+      border-radius: 50%;
+      transition: color 0.1s, background 0.1s;
+    }
+
+    .dtc-info-btn:hover { color: #3B82F6; background: #EFF6FF; }
+
+    .dtc-name { font-size: 12px; font-weight: 700; color: #1A1D2E; margin-bottom: 4px; }
+    .dtc-sub { font-size: 10px; color: #8A8FA8; }
+
+    /* ===== BOTTOM BANNER ===== */
+    .bottom-banner {
+      grid-area: banner;
+      background: #2A2F3E;
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .banner-icon {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 18px;
+    }
+
+    .banner-text { flex: 1; }
+    .banner-title { font-size: 13px; font-weight: 700; color: #fff; margin-bottom: 3px; }
+    .banner-sub { font-size: 11px; color: #A0A8C0; line-height: 1.5; }
+
+    /* ===== BUTTONS ===== */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      font-family: inherit;
+    }
+
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-navy { background: #1B2033; color: #fff; }
+    .btn-navy:hover:not(:disabled) { background: #2D3555; }
+    .btn-grey { background: #F1F5F9; color: #64748B; }
+    .btn-grey:hover { background: #E2E8F0; }
+    .btn-red { background: #EF4444; color: #fff; }
+    .btn-red:hover { background: #DC2626; }
+
+    .btn-outlined {
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid #1B2033;
+      color: #1B2033;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-outlined:hover { background: #1B2033; color: #fff; }
+
+    .btn-full {
+      width: 100%;
+      padding: 12px;
+      background: #1B2033;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      cursor: pointer;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-full:hover:not(:disabled) { background: #2D3555; }
+    .btn-full:disabled { opacity: 0.7; cursor: not-allowed; }
+
+    .btn-banner {
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 7px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+
+    .btn-banner:hover { background: rgba(255,255,255,0.18); }
+
+    /* ===== SCAN RESULTS ===== */
+    .scan-results {
+      margin-top: 12px;
+      background: #E6F9F0;
+      border-radius: 8px;
+      padding: 12px;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .scan-results-inner {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 11px;
+      color: #1A9E5C;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    .scan-results-inner i { font-size: 16px; margin-top: 1px; flex-shrink: 0; }
+
+    /* ===== OBD TABLE ===== */
+    .obd-table { width: 100%; border-collapse: collapse; font-family: 'Courier New', monospace; font-size: 12px; }
+    .obd-table tr:hover td { background: #F8FAFC; }
+    .obd-table td { padding: 9px 12px; border-bottom: 1px solid #E8EAF0; }
+    .obd-table td:first-child { color: #8A8FA8; font-weight: 600; width: 55%; }
+    .obd-table td:last-child { font-weight: 700; color: #1A1D2E; }
+    .obd-table tr:last-child td { border-bottom: none; }
+
+    /* ===== PARTS TABLE ===== */
+    .parts-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .parts-table th { text-align: left; padding: 8px 12px; font-size: 10px; font-weight: 700; color: #8A8FA8; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #E8EAF0; }
+    .parts-table td { padding: 11px 12px; border-bottom: 1px solid #F1F5F9; color: #1A1D2E; }
+    .parts-table tr:last-child td { border-bottom: none; }
+
+    /* ===== MODALS ===== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+
+    .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 420px;
+      width: calc(100% - 32px);
+      position: relative;
+      animation: slideUp 0.2s ease;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-card.wide { max-width: 520px; }
+
+    .modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #8A8FA8;
+      font-size: 18px;
+      transition: background 0.1s, color 0.1s;
+      line-height: 1;
+    }
+
+    .modal-close:hover { background: #F1F5F9; color: #1A1D2E; }
+
+    .modal-title { font-size: 16px; font-weight: 700; color: #1A1D2E; margin-bottom: 10px; padding-right: 28px; }
+    .modal-body { font-size: 13px; color: #64748B; line-height: 1.65; margin-bottom: 16px; }
+
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+    /* ===== FORM ELEMENTS ===== */
+    .form-group { margin-bottom: 14px; }
+
+    .form-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      color: #8A8FA8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 5px;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #E2E8F0;
+      border-radius: 7px;
+      font-size: 13px;
+      color: #1A1D2E;
+      background: #fff;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: #1B2033;
+      box-shadow: 0 0 0 3px rgba(27,32,51,0.06);
+    }
+
+    .form-textarea { resize: vertical; min-height: 80px; }
+
+    /* ===== TOGGLE SWITCHES ===== */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .toggle-row:last-of-type { border-bottom: none; }
+    .toggle-label { font-size: 13px; color: #1A1D2E; font-weight: 500; }
+
+    .toggle-switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: #CBD5E1;
+      border-radius: 11px;
+      transition: background 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+
+    .toggle-switch input:checked + .toggle-slider { background: #1B2033; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* ===== PDF PREVIEW ===== */
+    .pdf-preview {
+      background: #F8FAFC;
+      border-radius: 8px;
+      padding: 16px 18px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: #1A1D2E;
+      line-height: 1.85;
+      border: 1px solid #E2E8F0;
+      margin-bottom: 4px;
+      white-space: pre-wrap;
+    }
+
+    /* ===== TOAST ===== */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: #1B2033;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.22);
+      animation: slideInRight 0.25s ease;
+      max-width: 300px;
+      pointer-events: auto;
+    }
+
+    .toast.out { animation: fadeOutRight 0.35s ease forwards; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOutRight { to { transform: translateX(10px); opacity: 0; } }
+
+    /* ===== DARK MODE ===== */
+    body.dark {
+      background: #12151F;
+      color: #E2E8F0;
+    }
+
+    body.dark .main-content,
+    body.dark .page-scroll { background: #12151F; }
+
+    body.dark .topbar {
+      background: #1E2235;
+      border-bottom-color: #2D3555;
+    }
+
+    body.dark .topbar-title,
+    body.dark .topbar-tab.active { color: #E2E8F0; }
+
+    body.dark .topbar-tab.active { border-bottom-color: #E2E8F0; }
+    body.dark .topbar-tab { color: #6B7280; }
+    body.dark .topbar-tab:hover { color: #E2E8F0; }
+    body.dark .topbar-icon-btn { color: #8A8FA8; }
+    body.dark .topbar-icon-btn:hover { background: #2D3555; }
+
+    body.dark .vehicle-header,
+    body.dark .section-card,
+    body.dark .engine-card,
+    body.dark .dtc-card,
+    body.dark .stat-card,
+    body.dark .timeline-content,
+    body.dark .metric-row,
+    body.dark .scheduling-placeholder {
+      background: #1E2235;
+      border-color: #2D3555;
+    }
+
+    body.dark .stat-card:hover { background: #252A3D; }
+    body.dark .metric-row:hover { background: #252A3D; }
+
+    body.dark .secondary-tabs {
+      background: #1E2235;
+      border-color: #2D3555;
+    }
+
+    body.dark .sec-tab { color: #6B7280; }
+    body.dark .sec-tab:hover { color: #E2E8F0; }
+    body.dark .sec-tab.active { color: #E2E8F0; border-bottom-color: #E2E8F0; }
+
+    body.dark .section-title,
+    body.dark .engine-title,
+    body.dark .vehicle-name,
+    body.dark .metric-value,
+    body.dark .stat-card-value,
+    body.dark .entry-title,
+    body.dark .dtc-name,
+    body.dark .engine-temp { color: #E2E8F0; }
+
+    body.dark .sparkline-wrap,
+    body.dark .vehicle-img-placeholder { background: #252A3D; border-color: #2D3555; }
+    body.dark .progress-bg { background: #2D3555; }
+    body.dark .vehicle-id-pill { background: #3B4168; }
+
+    body.dark .dropdown-panel,
+    body.dark .avatar-dropdown { background: #1E2235; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    body.dark .notif-item { border-bottom-color: #2D3555; }
+    body.dark .notif-msg { color: #E2E8F0; }
+    body.dark .avatar-dd-header { border-bottom-color: #2D3555; }
+    body.dark .avatar-dd-name { color: #E2E8F0; }
+    body.dark .avatar-dd-link { color: #E2E8F0; }
+    body.dark .avatar-dd-link:hover { background: #252A3D; }
+
+    body.dark .entry-dropdown { background: #1E2235; box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+    body.dark .entry-dd-item { color: #E2E8F0; }
+    body.dark .entry-dd-item:hover { background: #252A3D; }
+    body.dark .entry-menu-btn { color: #6B7280; }
+    body.dark .entry-menu-btn:hover { background: #2D3555; color: #E2E8F0; }
+
+    body.dark .modal-card { background: #1E2235; }
+    body.dark .modal-title { color: #E2E8F0; }
+    body.dark .modal-close:hover { background: #2D3555; color: #E2E8F0; }
+    body.dark .form-input, body.dark .form-select, body.dark .form-textarea {
+      background: #12151F;
+      border-color: #2D3555;
+      color: #E2E8F0;
+    }
+    body.dark .toggle-row { border-bottom-color: #2D3555; }
+    body.dark .toggle-label { color: #E2E8F0; }
+    body.dark .pdf-preview { background: #12151F; border-color: #2D3555; color: #E2E8F0; }
+    body.dark .btn-outlined { border-color: #E2E8F0; color: #E2E8F0; }
+    body.dark .btn-outlined:hover { background: #E2E8F0; color: #1B2033; }
+    body.dark .btn-grey { background: #2D3555; color: #A0A8C0; }
+    body.dark .btn-grey:hover { background: #3B4168; }
+
+    body.dark .obd-table td { border-bottom-color: #2D3555; }
+    body.dark .obd-table td:last-child { color: #E2E8F0; }
+    body.dark .obd-table tr:hover td { background: #252A3D; }
+    body.dark .parts-table th { border-bottom-color: #2D3555; }
+    body.dark .parts-table td { color: #E2E8F0; border-bottom-color: #2D3555; }
+    body.dark .timeline-date { color: #6B7280; }
+    body.dark .entry-desc { color: #8A8FA8; }
+    body.dark .vehicle-meta { color: #6B7280; }
+    body.dark .vehicle-img-placeholder { color: #6B7280; }
+    body.dark .notif-dot-badge { border-color: #1E2235; }
+  </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+
+  <!-- ===== SIDEBAR ===== -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-row">
+        <div class="brand-icon"><i class="fa-solid fa-bolt"></i></div>
+        <span class="brand-name">Fleet<br>Command</span>
+      </div>
+      <div class="brand-sub">Active Ops</div>
+    </div>
+
+    <ul class="sidebar-nav">
+      <li class="nav-item" onclick="setNav(this)"><i class="fa-solid fa-house"></i><span>Dashboard</span></li>
+      <li class="nav-item" onclick="setNav(this)"><i class="fa-solid fa-grip"></i><span>Devices</span></li>
+      <li class="nav-item" onclick="setNav(this)"><i class="fa-solid fa-car"></i><span>Vehicles</span></li>
+      <li class="nav-item" onclick="setNav(this)"><i class="fa-solid fa-route"></i><span>Trajectory</span></li>
+      <li class="nav-item active" onclick="setNav(this)"><i class="fa-solid fa-wrench"></i><span>Maintenance</span></li>
+    </ul>
+
+    <div class="sidebar-bottom">
+      <div class="nav-item" onclick="openModal('modal-support')">
+        <i class="fa-regular fa-circle-question"></i><span>Support</span>
+      </div>
+      <div class="nav-item" onclick="openModal('modal-logout')">
+        <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="main-content">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <span class="topbar-title">Command Architect</span>
+
+      <div class="topbar-tabs">
+        <div class="topbar-tab active" data-top="fleet" onclick="switchTopTab(this)">Fleet Logs</div>
+        <div class="topbar-tab" data-top="scheduling" onclick="switchTopTab(this)">Scheduling</div>
+      </div>
+
+      <div class="topbar-spacer"></div>
+
+      <div class="topbar-actions">
+        <!-- Bell -->
+        <div class="topbar-icon-btn" id="bell-trigger" onclick="toggleDD('dd-notif', event)">
+          <i class="fa-regular fa-bell"></i>
+          <div class="notif-dot-badge" id="notif-badge"></div>
+        </div>
+        <div class="dropdown-panel" id="dd-notif" style="right:80px;">
+          <div class="notif-item">
+            <div class="nd red" id="nd-1"></div>
+            <div class="notif-text-wrap">
+              <div class="notif-msg">P0420 DTC code detected</div>
+              <div class="notif-ago">4h ago</div>
+            </div>
+          </div>
+          <div class="notif-item">
+            <div class="nd orange" id="nd-2"></div>
+            <div class="notif-text-wrap">
+              <div class="notif-msg">Next service in 12 days</div>
+              <div class="notif-ago">1d ago</div>
+            </div>
+          </div>
+          <div class="notif-item">
+            <div class="nd blue" id="nd-3"></div>
+            <div class="notif-text-wrap">
+              <div class="notif-msg">Predictive: Fuel pump risk 82%</div>
+              <div class="notif-ago">2d ago</div>
+            </div>
+          </div>
+          <div class="notif-footer"><a onclick="markAllRead()">Mark all as read</a></div>
+        </div>
+
+        <!-- Gear -->
+        <div class="topbar-icon-btn" onclick="openModal('modal-settings')">
+          <i class="fa-solid fa-gear"></i>
+        </div>
+
+        <!-- Avatar -->
+        <div class="topbar-avatar" onclick="toggleDD('dd-avatar', event)">JM
+          <div class="dropdown-panel avatar-dropdown" id="dd-avatar" style="right:0;">
+            <div class="avatar-dd-header">
+              <div class="avatar-dd-name">John Mitchell</div>
+              <div class="avatar-dd-role">Fleet Admin</div>
+            </div>
+            <div class="avatar-dd-link">Profile</div>
+            <div class="avatar-dd-link" onclick="openModal('modal-settings')">Settings</div>
+            <div class="avatar-dd-link danger" onclick="openModal('modal-logout')">Logout</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAGE SCROLL -->
+    <div class="page-scroll">
+
+      <!-- ====== FLEET LOGS CONTENT ====== -->
+      <div id="fleet-content">
+
+        <!-- VEHICLE HEADER -->
+        <div class="vehicle-header">
+          <div class="vehicle-img-block">
+            <div class="vehicle-img-placeholder">
+              <i class="fa-solid fa-truck-moving"></i>
+              <span>Vehicle Image</span>
+            </div>
+            <span class="vehicle-id-pill">ID: 802-19K</span>
+          </div>
+
+          <div class="vehicle-info">
+            <div class="vehicle-name">Sprinter EV Chassis-400</div>
+            <div class="vehicle-meta">
+              <span><i class="fa-solid fa-location-dot"></i> San Francisco Depot</span>
+              <span><i class="fa-solid fa-tag"></i> Heavy Logistics</span>
+            </div>
+            <div class="vehicle-badges">
+              <span class="badge badge-green clickable" id="duty-badge" onclick="toggleDuty()">
+                <span>●</span> Active Duty
+              </span>
+              <span class="miles-text">12,482 Miles Total</span>
+            </div>
+          </div>
+
+          <div class="vehicle-stat-cards">
+            <div class="stat-card" onclick="openModal('modal-battery')">
+              <div class="stat-card-label">Battery Health</div>
+              <div class="stat-card-value">94%</div>
+            </div>
+            <div class="stat-card" onclick="openModal('modal-service')">
+              <div class="stat-card-label">Next Service</div>
+              <div class="stat-card-value red">12 Days</div>
+              <div class="stat-card-sub">Brake Fluid Replacement</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECONDARY TABS -->
+        <div class="secondary-tabs">
+          <div class="sec-tab active" data-sec="maintenance" onclick="switchSecTab(this)">Maintenance History</div>
+          <div class="sec-tab" data-sec="obd" onclick="switchSecTab(this)">OBD Data &amp; Diagnostics</div>
+          <div class="sec-tab" data-sec="parts" onclick="switchSecTab(this)">Replacement Parts</div>
+        </div>
+
+        <!-- TAB: MAINTENANCE HISTORY -->
+        <div id="sec-maintenance" class="sec-panel">
+          <div class="three-col-grid">
+
+            <!-- COL 1: TIMELINE -->
+            <div class="col1-wrap">
+              <div class="section-card">
+                <div class="section-header">
+                  <div class="section-title">Service Timeline</div>
+                  <button class="btn-outlined" onclick="openAddLog(null)">+ Add Log</button>
+                </div>
+                <div class="timeline" id="timeline">
+
+                  <!-- Entry 1 -->
+                  <div class="timeline-entry" data-eid="e1">
+                    <div class="timeline-left">
+                      <div class="timeline-dot blue"></div>
+                      <div class="timeline-line"></div>
+                    </div>
+                    <div class="timeline-content">
+                      <div class="entry-menu-btn" onclick="toggleEntryDD(event,'e1')">⋯</div>
+                      <div class="entry-dropdown" id="edd-e1">
+                        <div class="entry-dd-item" onclick="openAddLog('e1')">Edit</div>
+                        <div class="entry-dd-item danger" onclick="deleteEntry('e1')">Delete</div>
+                      </div>
+                      <div class="timeline-date-row">
+                        <span class="timeline-date">OCT 12, 2023</span>
+                        <span class="badge badge-orange" style="font-size:9px;padding:2px 8px;cursor:default">ROUTINE</span>
+                      </div>
+                      <div class="entry-title">Level 2 Service: Transmission Flush &amp; Filtration</div>
+                      <div class="entry-desc">System pressure normalized. Minor wear detected on coupling. Fluid analyzed: Optimal.</div>
+                      <span class="file-link" onclick="openModal('modal-pdf')">
+                        <i class="fa-regular fa-file-pdf"></i> Service_Report_A402.pdf
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Entry 2 -->
+                  <div class="timeline-entry" data-eid="e2">
+                    <div class="timeline-left">
+                      <div class="timeline-dot orange"></div>
+                    </div>
+                    <div class="timeline-content">
+                      <div class="entry-menu-btn" onclick="toggleEntryDD(event,'e2')">⋯</div>
+                      <div class="entry-dropdown" id="edd-e2">
+                        <div class="entry-dd-item" onclick="openAddLog('e2')">Edit</div>
+                        <div class="entry-dd-item danger" onclick="deleteEntry('e2')">Delete</div>
+                      </div>
+                      <div class="timeline-date-row">
+                        <span class="timeline-date">AUG 29, 2023</span>
+                        <span class="badge badge-red-solid" style="font-size:9px;padding:2px 8px;cursor:default">REPAIR</span>
+                      </div>
+                      <div class="entry-title">Sensor Array Calibration (OBD Code P0121)</div>
+                      <div class="entry-desc">Replaced primary oxygen sensor in block 1. Cleared OBD system fault codes.</div>
+                    </div>
+                  </div>
+
+                </div><!-- /timeline -->
+              </div>
+            </div><!-- /col1 -->
+
+            <!-- COL 2: ENGINE STAT + METRICS -->
+            <div class="col2-wrap">
+              <div class="section-card">
+
+                <!-- Engine Card -->
+                <div class="engine-card">
+                  <div class="engine-card-header">
+                    <div>
+                      <div class="engine-title">Engine Thermostat Efficiency</div>
+                      <div class="engine-sub">Last 30 Days Variance</div>
+                    </div>
+                    <div class="wrench-btn" onclick="openModal('modal-recalibrate')" title="Recalibrate sensor">
+                      <i class="fa-solid fa-wrench"></i>
+                    </div>
+                  </div>
+                  <div class="engine-temp-row">
+                    <div class="engine-temp">194°</div>
+                    <span class="badge badge-green" style="cursor:default">+0.2% Stability</span>
+                  </div>
+                  <div class="sparkline-wrap">
+                    <svg viewBox="0 0 300 52" preserveAspectRatio="none" style="width:100%;height:52px;display:block">
+                      <defs>
+                        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stop-color="#1B2033" stop-opacity="0.12"/>
+                          <stop offset="100%" stop-color="#1B2033" stop-opacity="0"/>
+                        </linearGradient>
+                      </defs>
+                      <path d="M0,44 C15,40 30,34 50,30 C70,26 85,22 110,18 C130,15 150,13 170,11 C190,9 210,10 230,8 C250,6 270,6 300,4"
+                            fill="url(#sparkGrad)" stroke="none"/>
+                      <path d="M0,44 C15,40 30,34 50,30 C70,26 85,22 110,18 C130,15 150,13 170,11 C190,9 210,10 230,8 C250,6 270,6 300,4"
+                            fill="none" stroke="#1B2033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+                </div>
+
+                <!-- Metric Rows -->
+                <div class="metric-rows">
+
+                  <div class="metric-row" onclick="openMetricModal('fuel')">
+                    <div class="metric-row-top">
+                      <span class="metric-label">Fuel Consumption</span>
+                      <div class="metric-right">
+                        <span class="metric-value">18.4 mpg</span>
+                        <span class="metric-change red">-4.2%</span>
+                      </div>
+                    </div>
+                    <div class="progress-bg"><div class="progress-fill fill-navy" style="width:70%"></div></div>
+                  </div>
+
+                  <div class="metric-row" onclick="openMetricModal('brake')">
+                    <div class="metric-row-top">
+                      <span class="metric-label">Brake Pad Life</span>
+                      <div class="metric-right">
+                        <span class="metric-value">42%</span>
+                        <span class="metric-change orange">Warning</span>
+                      </div>
+                    </div>
+                    <div class="progress-bg"><div class="progress-fill fill-orange" style="width:42%"></div></div>
+                  </div>
+
+                  <div class="metric-row" onclick="openMetricModal('coolant')">
+                    <div class="metric-row-top">
+                      <span class="metric-label">Coolant Temp</span>
+                      <div class="metric-right">
+                        <span class="metric-value">102 °C</span>
+                        <span class="metric-change green">Nominal</span>
+                      </div>
+                    </div>
+                    <div class="metric-tiny">Steady over 6h operation</div>
+                    <div class="progress-bg"><div class="progress-fill fill-navy" style="width:65%"></div></div>
+                  </div>
+
+                </div>
+              </div>
+            </div><!-- /col2 -->
+
+            <!-- COL 3: DTC CODES -->
+            <div class="col3-wrap">
+              <div class="section-card">
+                <div class="section-header">
+                  <div class="section-title">Active DTC Codes</div>
+                  <span class="badge badge-red-solid" style="font-size:9px;padding:3px 10px;cursor:default">LIVE DIAGNOSTIC</span>
+                </div>
+
+                <div class="dtc-card">
+                  <div class="dtc-card-top">
+                    <span class="badge badge-red-solid" style="font-family:'Courier New',monospace;font-size:12px;padding:4px 12px;cursor:default;font-weight:700">P0420</span>
+                    <div class="dtc-info-btn" onclick="openModal('modal-dtc')" title="More info">
+                      <i class="fa-solid fa-circle-info"></i>
+                    </div>
+                  </div>
+                  <div class="dtc-name">Catalyst Efficiency Below Threshold</div>
+                  <div class="dtc-sub">Detected 4h ago &bull; Block 1</div>
+                </div>
+
+                <button class="btn-full" id="scan-btn" onclick="runScan()">Run Full System Scan</button>
+
+                <div class="scan-results" id="scan-results">
+                  <div class="scan-results-inner">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <div><strong>Scan complete.</strong> 1 active code found: P0420.<br>All other systems nominal.</div>
+                  </div>
+                </div>
+
+              </div>
+            </div><!-- /col3 -->
+
+            <!-- BOTTOM BANNER (spans col 2–3) -->
+            <div class="bottom-banner">
+              <div class="banner-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
+              <div class="banner-text">
+                <div class="banner-title">Predictive Analysis Active</div>
+                <div class="banner-sub">AI model suggests a 82% probability of fuel pump issues within the next 450 miles</div>
+              </div>
+              <button class="btn-banner" onclick="openModal('modal-predictive')">Schedule Preemptive Fix</button>
+            </div>
+
+          </div><!-- /three-col-grid -->
+        </div><!-- /sec-maintenance -->
+
+        <!-- TAB: OBD DATA -->
+        <div id="sec-obd" class="sec-panel" style="display:none">
+          <div class="section-card">
+            <div class="section-header">
+              <div class="section-title">OBD Data &amp; Diagnostics</div>
+              <span class="badge badge-green" style="font-size:10px;cursor:default">● Live Feed</span>
+            </div>
+            <table class="obd-table">
+              <tr><td>Engine RPM</td><td>820 rpm</td></tr>
+              <tr><td>Mass Air Flow (MAF)</td><td>14.3 g/s</td></tr>
+              <tr><td>O2 Sensor B1</td><td>0.45 V</td></tr>
+              <tr><td>Throttle Position</td><td>18%</td></tr>
+              <tr><td>Battery Voltage</td><td>13.8 V</td></tr>
+              <tr><td>Engine Load</td><td>24%</td></tr>
+              <tr><td>Intake Air Temp</td><td>31 °C</td></tr>
+              <tr><td>Short Term Fuel Trim</td><td>+2.3%</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB: REPLACEMENT PARTS -->
+        <div id="sec-parts" class="sec-panel" style="display:none">
+          <div class="section-card">
+            <div class="section-header">
+              <div class="section-title">Replacement Parts</div>
+            </div>
+            <table class="parts-table">
+              <thead>
+                <tr><th>Part Name</th><th>Part Number</th><th>Stock</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Brake Fluid (DOT 4)</td><td>BF-4-500ML</td><td>24 units</td>
+                  <td><span class="badge badge-green" style="font-size:10px;cursor:default">In Stock</span></td>
+                </tr>
+                <tr>
+                  <td>Oil Filter</td><td>OF-M20x1.5</td><td>3 units</td>
+                  <td><span class="badge badge-red" style="font-size:10px;cursor:default">Low Stock</span></td>
+                </tr>
+                <tr>
+                  <td>O2 Sensor (Block 1)</td><td>O2-NTK-OZA495</td><td>8 units</td>
+                  <td><span class="badge badge-green" style="font-size:10px;cursor:default">In Stock</span></td>
+                </tr>
+                <tr>
+                  <td>Thermostat</td><td>TST-EV-87C</td><td>1 unit</td>
+                  <td><span class="badge badge-red" style="font-size:10px;cursor:default">Low Stock</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /fleet-content -->
+
+      <!-- SCHEDULING PLACEHOLDER -->
+      <div id="scheduling-content" style="display:none">
+        <div class="scheduling-placeholder">
+          <i class="fa-regular fa-calendar" style="font-size:36px;display:block;margin-bottom:14px;color:#8A8FA8"></i>
+          Scheduling module coming soon.
+        </div>
+      </div>
+
+    </div><!-- /page-scroll -->
+  </div><!-- /main-content -->
+</div><!-- /app-wrapper -->
+
+
+<!-- ==============================
+         MODALS
+     ============================== -->
+
+<!-- Support -->
+<div class="modal-overlay" id="modal-support" onclick="overlayClick(event,'modal-support')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-support')">&times;</div>
+    <div class="modal-title"><i class="fa-regular fa-circle-question" style="color:#3B82F6;margin-right:8px"></i>Need Help?</div>
+    <div class="modal-body">Contact our support team at <strong>support@fleetcommand.io</strong>.<br><br>Available 24/7 for technical assistance and account issues.</div>
+    <div class="modal-footer">
+      <button class="btn navy" onclick="closeModal('modal-support')" style="background:#1B2033;color:#fff;padding:8px 18px;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">Got It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Logout -->
+<div class="modal-overlay" id="modal-logout" onclick="overlayClick(event,'modal-logout')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-logout')">&times;</div>
+    <div class="modal-title">Confirm Logout</div>
+    <div class="modal-body">Are you sure you want to logout of Fleet Command?</div>
+    <div class="modal-footer">
+      <button class="btn btn-grey" onclick="closeModal('modal-logout')">Cancel</button>
+      <button class="btn btn-red" onclick="closeModal('modal-logout')">Yes, Logout</button>
+    </div>
+  </div>
+</div>
+
+<!-- Battery -->
+<div class="modal-overlay" id="modal-battery" onclick="overlayClick(event,'modal-battery')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-battery')">&times;</div>
+    <div class="modal-title"><i class="fa-solid fa-battery-three-quarters" style="color:#1A9E5C;margin-right:8px"></i>Battery Health Detail</div>
+    <div class="modal-body">Battery health at <strong>94%</strong>. Last checked: Oct 12, 2023.<br><br>
+      <strong>Estimated range:</strong> 280 miles<br>
+      <strong>Cell variance:</strong> 0.02 V (optimal)<br>
+      <strong>Charge cycles:</strong> 312<br>
+      <strong>Pack temperature:</strong> 28 °C</div>
+    <div class="modal-footer">
+      <button class="btn btn-navy" onclick="closeModal('modal-battery')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Service -->
+<div class="modal-overlay" id="modal-service" onclick="overlayClick(event,'modal-service')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-service')">&times;</div>
+    <div class="modal-title"><i class="fa-solid fa-calendar-check" style="color:#C0392B;margin-right:8px"></i>Next Service Detail</div>
+    <div class="modal-body">Next service due in <strong>12 days</strong>.<br><br>
+      <strong>Type:</strong> Brake Fluid Replacement<br>
+      <strong>Scheduled:</strong> Oct 26, 2023<br>
+      <strong>Assigned Technician:</strong> J. Torres<br>
+      <strong>Estimated Duration:</strong> 1.5 hours</div>
+    <div class="modal-footer">
+      <button class="btn btn-navy" onclick="closeModal('modal-service')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- DTC Info -->
+<div class="modal-overlay" id="modal-dtc" onclick="overlayClick(event,'modal-dtc')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-dtc')">&times;</div>
+    <div class="modal-title">Code P0420 — Catalyst System</div>
+    <div class="modal-body">
+      <strong>Catalyst System Efficiency Below Threshold.</strong><br><br>
+      This means the catalytic converter is not operating at maximum efficiency. The ECU monitors upstream and downstream O2 sensor readings and compares conversion rates against expected thresholds.<br><br>
+      <strong>Recommended action:</strong> Inspect the exhaust system and O2 sensors. Check for exhaust leaks upstream of the catalytic converter before considering a replacement.
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-navy" onclick="closeModal('modal-dtc')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recalibrate -->
+<div class="modal-overlay" id="modal-recalibrate" onclick="overlayClick(event,'modal-recalibrate')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-recalibrate')">&times;</div>
+    <div class="modal-title">Recalibrate Thermostat Sensor?</div>
+    <div class="modal-body">This will schedule a remote sensor recalibration for vehicle <strong>802-19K</strong> at the next engine-off event.<br><br>Current reading: 194°F — variance within acceptable range.</div>
+    <div class="modal-footer">
+      <button class="btn btn-grey" onclick="closeModal('modal-recalibrate')">Cancel</button>
+      <button class="btn btn-navy" onclick="confirmRecalibrate()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF Preview -->
+<div class="modal-overlay" id="modal-pdf" onclick="overlayClick(event,'modal-pdf')">
+  <div class="modal-card wide">
+    <div class="modal-close" onclick="closeModal('modal-pdf')">&times;</div>
+    <div class="modal-title"><i class="fa-regular fa-file-pdf" style="color:#C0392B;margin-right:7px"></i>Service_Report_A402.pdf</div>
+    <div class="pdf-preview">FLEET COMMAND — SERVICE REPORT
+================================
+Report ID    : A402
+Date         : October 12, 2023
+Vehicle      : Sprinter EV Chassis-400
+Vehicle ID   : 802-19K
+
+Service Type : Level 2 Routine Service
+Technician   : J. Torres
+Mileage      : 12,482 mi
+--------------------------------
+SERVICE NOTES:
+- Transmission fluid flushed (8.4 qts replaced)
+- Filtration element replaced: Part #TF-440B
+- System pressure test: 142 PSI (nominal)
+- Minor coupling wear detected (non-critical)
+- Fluid spectral analysis: OPTIMAL
+- No leaks observed post-flush
+--------------------------------
+NEXT SCHEDULED SERVICE: Oct 26, 2023
+Brake Fluid Replacement (DOT 4)
+================================</div>
+    <div class="modal-footer">
+      <button class="btn btn-grey" onclick="closeModal('modal-pdf')">Close</button>
+      <button class="btn btn-navy" onclick="downloadReport()"><i class="fa-solid fa-download" style="margin-right:6px"></i>Download</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Log -->
+<div class="modal-overlay" id="modal-addlog" onclick="overlayClick(event,'modal-addlog')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-addlog')">&times;</div>
+    <div class="modal-title" id="addlog-heading">Add Service Log</div>
+    <div class="form-group">
+      <label class="form-label">Log Title</label>
+      <input type="text" id="log-title" class="form-input" placeholder="e.g. Oil Change — 15k Service">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select id="log-type" class="form-select">
+        <option value="ROUTINE">Routine</option>
+        <option value="REPAIR">Repair</option>
+        <option value="INSPECTION">Inspection</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea id="log-notes" class="form-textarea" placeholder="Describe the service performed..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input type="date" id="log-date" class="form-input">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-grey" onclick="closeModal('modal-addlog')">Cancel</button>
+      <button class="btn btn-navy" onclick="saveLog()">Save Log</button>
+    </div>
+  </div>
+</div>
+
+<!-- Metric Chart -->
+<div class="modal-overlay" id="modal-metric" onclick="overlayClick(event,'modal-metric')">
+  <div class="modal-card wide">
+    <div class="modal-close" onclick="closeModal('modal-metric')">&times;</div>
+    <div class="modal-title" id="metric-title">Metric — Last 7 Days</div>
+    <div class="modal-body" id="metric-desc" style="margin-bottom:12px"></div>
+    <canvas id="metric-canvas" height="160" style="width:100%;display:block"></canvas>
+    <div class="modal-footer">
+      <button class="btn btn-navy" onclick="closeModal('modal-metric')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Predictive Schedule -->
+<div class="modal-overlay" id="modal-predictive" onclick="overlayClick(event,'modal-predictive')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-predictive')">&times;</div>
+    <div class="modal-title">Schedule Preemptive Maintenance</div>
+    <div class="form-group">
+      <label class="form-label">Select Mechanic</label>
+      <select class="form-select">
+        <option>J. Torres — Senior Technician</option>
+        <option>A. Smith — EV Specialist</option>
+        <option>M. Johnson — Diagnostics Lead</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Preferred Date</label>
+      <input type="date" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Additional Notes</label>
+      <textarea class="form-textarea" placeholder="Include any relevant observations..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-grey" onclick="closeModal('modal-predictive')">Cancel</button>
+      <button class="btn btn-navy" onclick="confirmBooking()">Confirm Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal-overlay" id="modal-settings" onclick="overlayClick(event,'modal-settings')">
+  <div class="modal-card">
+    <div class="modal-close" onclick="closeModal('modal-settings')">&times;</div>
+    <div class="modal-title">Settings</div>
+    <div class="toggle-row">
+      <span class="toggle-label">Email alerts</span>
+      <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Push notifications</span>
+      <label class="toggle-switch"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Dark mode</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="dark-toggle" onchange="toggleDark(this)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-navy" onclick="closeModal('modal-settings')">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toasts"></div>
+
+
+<!-- ==============================
+         JAVASCRIPT
+     ============================== -->
+<script>
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const entries = {
+  e1: { title: 'Level 2 Service: Transmission Flush & Filtration', type: 'ROUTINE', notes: 'System pressure normalized. Minor wear detected on coupling. Fluid analyzed: Optimal.', date: '2023-10-12', dot: 'blue' },
+  e2: { title: 'Sensor Array Calibration (OBD Code P0121)', type: 'REPAIR', notes: 'Replaced primary oxygen sensor in block 1. Cleared OBD system fault codes.', date: '2023-08-29', dot: 'orange' }
+};
+let editingEid = null;
+let eidCounter = 3;
+let scanRunning = false;
+
+// ─── NAV ─────────────────────────────────────────────────────────────────────
+function setNav(el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// ─── TOP TABS ─────────────────────────────────────────────────────────────────
+function switchTopTab(el) {
+  document.querySelectorAll('.topbar-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const isScheduling = el.dataset.top === 'scheduling';
+  document.getElementById('fleet-content').style.display = isScheduling ? 'none' : 'block';
+  document.getElementById('scheduling-content').style.display = isScheduling ? 'block' : 'none';
+}
+
+// ─── SECONDARY TABS ───────────────────────────────────────────────────────────
+function switchSecTab(el) {
+  document.querySelectorAll('.sec-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.sec-panel').forEach(p => p.style.display = 'none');
+  document.getElementById('sec-' + el.dataset.sec).style.display = 'block';
+}
+
+// ─── DROPDOWNS ────────────────────────────────────────────────────────────────
+function toggleDD(id, e) {
+  e.stopPropagation();
+  const panel = document.getElementById(id);
+  const wasOpen = panel.classList.contains('open');
+  closeAllDDs();
+  if (!wasOpen) panel.classList.add('open');
+}
+
+function closeAllDDs() {
+  document.querySelectorAll('.dropdown-panel').forEach(p => p.classList.remove('open'));
+}
+
+document.addEventListener('click', () => {
+  closeAllDDs();
+  document.querySelectorAll('.entry-dropdown').forEach(d => d.classList.remove('open'));
+});
+
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+function markAllRead() {
+  ['nd-1','nd-2','nd-3'].forEach(id => document.getElementById(id).classList.add('read'));
+  document.getElementById('notif-badge').style.display = 'none';
+  closeAllDDs();
+}
+
+// ─── DUTY TOGGLE ─────────────────────────────────────────────────────────────
+function toggleDuty() {
+  const b = document.getElementById('duty-badge');
+  if (b.classList.contains('badge-green')) {
+    b.classList.replace('badge-green', 'badge-grey');
+    b.innerHTML = '<span>●</span> Off Duty';
+  } else {
+    b.classList.replace('badge-grey', 'badge-green');
+    b.innerHTML = '<span>●</span> Active Duty';
+  }
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function openModal(id) {
+  closeAllDDs();
+  document.querySelectorAll('.entry-dropdown').forEach(d => d.classList.remove('open'));
+  document.getElementById(id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function overlayClick(e, id) {
+  if (e.target === document.getElementById(id)) closeModal(id);
+}
+
+// ─── DARK MODE ────────────────────────────────────────────────────────────────
+function toggleDark(cb) {
+  document.body.classList.toggle('dark', cb.checked);
+}
+
+// ─── ADD / EDIT LOG ───────────────────────────────────────────────────────────
+function openAddLog(eid) {
+  editingEid = eid;
+  document.querySelectorAll('.entry-dropdown').forEach(d => d.classList.remove('open'));
+
+  if (eid && entries[eid]) {
+    const d = entries[eid];
+    document.getElementById('addlog-heading').textContent = 'Edit Service Log';
+    document.getElementById('log-title').value = d.title;
+    document.getElementById('log-type').value = d.type;
+    document.getElementById('log-notes').value = d.notes;
+    document.getElementById('log-date').value = d.date;
+  } else {
+    document.getElementById('addlog-heading').textContent = 'Add Service Log';
+    document.getElementById('log-title').value = '';
+    document.getElementById('log-type').value = 'ROUTINE';
+    document.getElementById('log-notes').value = '';
+    document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
+  }
+  openModal('modal-addlog');
+}
+
+function saveLog() {
+  const title = document.getElementById('log-title').value.trim();
+  const type  = document.getElementById('log-type').value;
+  const notes = document.getElementById('log-notes').value.trim();
+  const date  = document.getElementById('log-date').value;
+
+  if (!title) { document.getElementById('log-title').focus(); return; }
+
+  const displayDate = date
+    ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).toUpperCase()
+    : 'TODAY';
+
+  if (editingEid) {
+    entries[editingEid] = { ...entries[editingEid], title, type, notes, date };
+    const el = document.querySelector(`[data-eid="${editingEid}"]`);
+    el.querySelector('.entry-title').textContent = title;
+    el.querySelector('.entry-desc').textContent = notes;
+    el.querySelector('.timeline-date').textContent = displayDate;
+    const pill = el.querySelector('.timeline-date-row .badge');
+    applyTypePill(pill, type);
+    showToast('✓ Log updated successfully.');
+  } else {
+    const eid = 'e' + (eidCounter++);
+    entries[eid] = { title, type, notes, date, dot: 'blue' };
+    const el = buildEntryEl(eid, displayDate, type, title, notes, 'blue');
+    const timeline = document.getElementById('timeline');
+    timeline.insertBefore(el, timeline.firstChild);
+    showToast('✓ Log added successfully.');
+  }
+
+  closeModal('modal-addlog');
+}
+
+function applyTypePill(el, type) {
+  el.className = 'badge';
+  el.style.cssText = 'font-size:9px;padding:2px 8px;cursor:default';
+  if (type === 'REPAIR')      el.classList.add('badge-red-solid');
+  else if (type === 'INSPECTION') el.classList.add('badge-green');
+  else                         el.classList.add('badge-orange');
+  el.textContent = type;
+}
+
+function buildEntryEl(eid, dateStr, type, title, notes, dot) {
+  const div = document.createElement('div');
+  div.className = 'timeline-entry';
+  div.dataset.eid = eid;
+
+  const pillClass = type === 'REPAIR' ? 'badge-red-solid' : type === 'INSPECTION' ? 'badge-green' : 'badge-orange';
+
+  div.innerHTML = `
+    <div class="timeline-left">
+      <div class="timeline-dot ${dot}"></div>
+      <div class="timeline-line"></div>
+    </div>
+    <div class="timeline-content">
+      <div class="entry-menu-btn" onclick="toggleEntryDD(event,'${eid}')">⋯</div>
+      <div class="entry-dropdown" id="edd-${eid}">
+        <div class="entry-dd-item" onclick="openAddLog('${eid}')">Edit</div>
+        <div class="entry-dd-item danger" onclick="deleteEntry('${eid}')">Delete</div>
+      </div>
+      <div class="timeline-date-row">
+        <span class="timeline-date">${dateStr}</span>
+        <span class="badge ${pillClass}" style="font-size:9px;padding:2px 8px;cursor:default">${type}</span>
+      </div>
+      <div class="entry-title">${escHtml(title)}</div>
+      <div class="entry-desc">${escHtml(notes)}</div>
+    </div>`;
+  return div;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── ENTRY MENU ───────────────────────────────────────────────────────────────
+function toggleEntryDD(e, eid) {
+  e.stopPropagation();
+  const dd = document.getElementById('edd-' + eid);
+  const wasOpen = dd.classList.contains('open');
+  document.querySelectorAll('.entry-dropdown').forEach(d => d.classList.remove('open'));
+  if (!wasOpen) dd.classList.add('open');
+}
+
+function deleteEntry(eid) {
+  document.querySelectorAll('.entry-dropdown').forEach(d => d.classList.remove('open'));
+  const el = document.querySelector(`[data-eid="${eid}"]`);
+  if (!el) return;
+  el.style.transition = 'opacity 0.3s ease, max-height 0.35s ease, padding 0.35s ease, margin 0.35s ease';
+  el.style.overflow = 'hidden';
+  el.style.maxHeight = el.offsetHeight + 'px';
+  el.style.opacity = '1';
+  requestAnimationFrame(() => {
+    el.style.opacity = '0';
+    el.style.maxHeight = '0';
+    el.style.paddingBottom = '0';
+    el.style.marginBottom = '0';
+  });
+  setTimeout(() => { el.remove(); delete entries[eid]; }, 380);
+}
+
+// ─── SCAN ─────────────────────────────────────────────────────────────────────
+function runScan() {
+  if (scanRunning) return;
+  scanRunning = true;
+  const btn = document.getElementById('scan-btn');
+  const results = document.getElementById('scan-results');
+  results.style.display = 'none';
+  btn.disabled = true;
+  let pct = 0;
+
+  const iv = setInterval(() => {
+    pct = Math.min(100, pct + Math.floor(Math.random() * 7) + 3);
+    btn.textContent = `Scanning… ${pct}%`;
+    if (pct >= 100) {
+      clearInterval(iv);
+      setTimeout(() => {
+        btn.textContent = 'Run Full System Scan';
+        btn.disabled = false;
+        results.style.display = 'block';
+        scanRunning = false;
+      }, 400);
+    }
+  }, 100);
+}
+
+// ─── RECALIBRATE ─────────────────────────────────────────────────────────────
+function confirmRecalibrate() {
+  closeModal('modal-recalibrate');
+  showToast('✓ Recalibration scheduled.');
+}
+
+// ─── BOOKING ─────────────────────────────────────────────────────────────────
+function confirmBooking() {
+  closeModal('modal-predictive');
+  showToast('✓ Maintenance booked successfully.');
+}
+
+// ─── PDF DOWNLOAD ─────────────────────────────────────────────────────────────
+function downloadReport() {
+  const text = `FLEET COMMAND — SERVICE REPORT A402\nDate: October 12, 2023\nVehicle: Sprinter EV Chassis-400 (ID: 802-19K)\n\nService Type: Level 2 Routine Service\nTechnician: J. Torres\nMileage: 12,482 mi\n\nSERVICE NOTES:\n- Transmission fluid flushed (8.4 qts replaced)\n- Filtration element replaced: Part #TF-440B\n- System pressure test: 142 PSI (nominal)\n- Minor coupling wear detected (non-critical)\n- Fluid spectral analysis: OPTIMAL\n- No leaks observed post-flush\n\nNEXT SCHEDULED SERVICE: Oct 26, 2023\nBrake Fluid Replacement (DOT 4)`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.download = 'Service_Report_A402.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ─── METRIC MODAL ─────────────────────────────────────────────────────────────
+const METRICS = {
+  fuel:    { title: 'Fuel Consumption — Last 7 Days',   desc: 'Average fuel consumption over the past 7 days. Trend: −4.2% vs. previous period.', data: [19.2, 18.8, 19.5, 18.1, 17.9, 18.6, 18.4], color: '#1B2033', unit: 'mpg' },
+  brake:   { title: 'Brake Pad Life — Last 7 Days',     desc: 'Estimated brake pad life remaining (%). Below 50% triggers a Warning alert.',        data: [48, 47, 46, 45, 44, 43, 42],             color: '#F59E0B', unit: '%'   },
+  coolant: { title: 'Coolant Temperature — Last 7 Days', desc: 'Engine coolant temperature over the last 7 days. Current status: Nominal.',           data: [100, 101, 103, 102, 101, 102, 102],      color: '#1A9E5C', unit: '°C'  }
+};
+
+function openMetricModal(key) {
+  const m = METRICS[key];
+  document.getElementById('metric-title').textContent = m.title;
+  document.getElementById('metric-desc').textContent  = m.desc;
+  openModal('modal-metric');
+  setTimeout(() => drawBarChart(m), 60);
+}
+
+function drawBarChart(m) {
+  const canvas = document.getElementById('metric-canvas');
+  const W = canvas.clientWidth || 460;
+  const H = 160;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const days  = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const data  = m.data;
+  const max   = Math.max(...data);
+  const min   = Math.min(...data);
+  const range = max - min || 1;
+
+  const pL = 48, pR = 12, pT = 20, pB = 32;
+  const chartW = W - pL - pR;
+  const chartH = H - pT - pB;
+  const slotW  = chartW / days.length;
+  const barW   = Math.min(Math.floor(slotW * 0.55), 36);
+
+  ctx.font = '10px Inter, system-ui, sans-serif';
+
+  days.forEach((day, i) => {
+    const val  = data[i];
+    const barH = Math.round(((val - min) / range) * chartH * 0.75 + chartH * 0.18);
+    const x    = pL + i * slotW + (slotW - barW) / 2;
+    const y    = pT + chartH - barH;
+    const r    = 4;
+
+    // Bar
+    ctx.fillStyle = m.color;
+    ctx.globalAlpha = 0.88;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + barW - r, y);
+    ctx.arcTo(x + barW, y, x + barW, y + r, r);
+    ctx.lineTo(x + barW, y + barH);
+    ctx.lineTo(x, y + barH);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Value label
+    ctx.fillStyle = '#1A1D2E';
+    ctx.textAlign = 'center';
+    ctx.fillText(val + m.unit, x + barW / 2, y - 5);
+
+    // Day label
+    ctx.fillStyle = '#8A8FA8';
+    ctx.fillText(day, x + barW / 2, H - 8);
+  });
+
+  // Y-axis guide line
+  ctx.strokeStyle = '#E8EAF0';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pL - 8, pT);
+  ctx.lineTo(pL - 8, pT + chartH);
+  ctx.stroke();
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 360);
+  }, 3000);
+}
+
+</script>
+</body>
+</html>

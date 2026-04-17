@@ -1,0 +1,32 @@
+name: parking_lora_frontend
+description: Frontend pour le système de parking GPS LoRa
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  fl_chart: ^1.2.0
+  google_fonts: ^8.0.2
+  cupertino_icons: ^1.0.2
+  flutter_map: ^6.1.0 # Ajouté pour OpenStreetMap
+  latlong2: ^0.9.0 
+  flutter_svg: ^2.0.9   # pour icônes modernes
+  iconsax: ^0.0.8   # Ajouté pour les coordonnées GPS
+  intl: ^0.20.2     # Used by trajectory_page.dart for date formatting
+  firebase_core: ^4.7.0
+  firebase_data_connect: ^0.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/mon_fond.jpg
