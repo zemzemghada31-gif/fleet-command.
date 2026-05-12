@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../constants.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -33,16 +37,43 @@ class _LoginPageState extends State<LoginPage> {
       _loading = true;
       _error = null;
     });
-    await Future.delayed(const Duration(milliseconds: 700));
-    if (!mounted) return;
-    if ((email == 'admin@fleet.io' || email == 'admin') &&
-        (pass == 'admin123' || pass == 'admin')) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      setState(() {
-        _loading = false;
-        _error = 'Invalid email or password. See demo credentials below.';
-      });
+    try {
+      final res = await http.post(
+        Uri.parse('$kApiBaseUrl/api/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email, 'password': pass}),
+      ).timeout(const Duration(seconds: 10));
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', data['access_token']);
+        await prefs.setString('auth_user', json.encode(data['user']));
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(() {
+          _loading = false;
+          _error = 'Invalid email or password.';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      // Fallback to offline demo mode
+      if ((email == 'admin@fleet.io' || email == 'admin') &&
+          (pass == 'admin123' || pass == 'admin')) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', 'offline-demo');
+        await prefs.setString('auth_user', json.encode({
+          'id': 1, 'email': 'admin@fleet.io', 'name': 'Admin User',
+          'role': 'admin', 'phone': '+1 (800) 555-FLEET',
+        }));
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        setState(() {
+          _loading = false;
+          _error = 'Backend offline. Use demo: admin@fleet.io / admin123';
+        });
+      }
     }
   }
 
@@ -62,48 +93,53 @@ class _LoginPageState extends State<LoginPage> {
                   colors: [Color(0xFF0F172A), Color(0xFF1E3A5F)],
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.dashboard, size: 64, color: Colors.white),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Fleet Command',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Active Operations Center',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 56),
-                  _featureBullet(Icons.location_on_outlined, 'Real-time vehicle tracking'),
-                  _featureBullet(Icons.analytics_outlined, 'Advanced fleet analytics'),
-                  _featureBullet(Icons.route_outlined, 'Full trajectory history'),
-                  _featureBullet(Icons.security_outlined, 'Enterprise-grade security'),
-                  const SizedBox(height: 48),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'v2.4.1  ·  Fleet Command Platform',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 12,
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.dashboard, size: 64, color: Colors.white),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Fleet Command',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Active Operations Center',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 56),
+                      _featureBullet(Icons.location_on_outlined, 'Real-time vehicle tracking'),
+                      _featureBullet(Icons.analytics_outlined, 'Advanced fleet analytics'),
+                      _featureBullet(Icons.route_outlined, 'Full trajectory history'),
+                      _featureBullet(Icons.security_outlined, 'Enterprise-grade security'),
+                      const SizedBox(height: 48),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'v2.4.1  ·  Fleet Command Platform',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -223,9 +259,11 @@ class _LoginPageState extends State<LoginPage> {
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
                         ),
-                        const Text('Remember me',
-                            style: TextStyle(
-                                fontSize: 13, color: Color(0xFF64748B))),
+                        const Flexible(
+                          child: Text('Remember me',
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF64748B))),
+                        ),
                         const Spacer(),
                         TextButton(
                           onPressed: () {},
@@ -275,12 +313,12 @@ class _LoginPageState extends State<LoginPage> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: const Color(0xFFBAE6FD)),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Icon(Icons.info_outline,
+                          Icon(Icons.info_outline,
                               size: 16, color: Color(0xFF0369A1)),
-                          const SizedBox(width: 8),
-                          const Expanded(
+                          SizedBox(width: 8),
+                          Expanded(
                             child: Text.rich(
                               TextSpan(
                                 style: TextStyle(
@@ -320,10 +358,12 @@ class _LoginPageState extends State<LoginPage> {
         children: [
           Icon(icon, size: 18, color: Colors.white.withValues(alpha: 0.75)),
           const SizedBox(width: 14),
-          Text(
-            text,
-            style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.75), fontSize: 14),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75), fontSize: 14),
+            ),
           ),
         ],
       ),

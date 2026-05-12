@@ -183,7 +183,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(children: const [
+        title: const Row(children: [
           Icon(Icons.download_done_rounded, color: Color(0xFF3B82F6)),
           SizedBox(width: 10),
           Text('Export Ready', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -254,24 +254,28 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left Column
-          Expanded(
-            flex: 3,
-            child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: SizedBox(
+            width: constraints.maxWidth - 64, // 32px padding × 2
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left Column
+                Expanded(
+                  flex: 3,
+                  child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text('Fleet Analytics', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                           Text('Global performance metrics and operational efficiency data.', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
                         ],
@@ -310,7 +314,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           ),
         ],
       ),
+      ),
     );
+    },
+  );
   }
 
   Widget _buildTimeFilter() {
@@ -633,7 +640,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+                    children: [
                           const Icon(Icons.info_outline,
                               size: 12, color: Color(0xFF3B82F6)),
                           const SizedBox(width: 5),
@@ -801,7 +808,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
@@ -810,10 +817,10 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
               // ── Real OSM mini-map ─────────────────────────────────────
               FlutterMap(
                 mapController: _netMapController,
-                options: MapOptions(
-                  initialCenter: const LatLng(37.5, -97.0), // center of USA
+                options: const MapOptions(
+                  initialCenter: LatLng(37.5, -97.0), // center of USA
                   initialZoom: 3.5,
-                  interactionOptions: const InteractionOptions(
+                  interactionOptions: InteractionOptions(
                     flags: InteractiveFlag.none, // locked in mini view
                   ),
                 ),
@@ -847,7 +854,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                 color: color,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: isHovered ? 2.5 : 1.5),
-                                boxShadow: [BoxShadow(color: color.withOpacity(0.5), blurRadius: isHovered ? 8 : 3)],
+                                boxShadow: [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: isHovered ? 8 : 3)],
                               ),
                               child: Icon(
                                 v['status'] == 'moving' ? Icons.local_shipping : v['status'] == 'service' ? Icons.build : Icons.local_parking,
@@ -872,7 +879,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.black.withOpacity(0.65), Colors.transparent],
+                      colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent],
                     ),
                   ),
                   child: Row(children: [
@@ -884,13 +891,13 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(children: [
-                        const Icon(Icons.circle, size: 7, color: Color(0xFF22C55E)),
-                        const SizedBox(width: 4),
-                        Text('LIVE', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      child: const Row(children: [
+                        Icon(Icons.circle, size: 7, color: Color(0xFF22C55E)),
+                        SizedBox(width: 4),
+                        Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                       ]),
                     ),
                   ]),
@@ -906,7 +913,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [Colors.black.withOpacity(0.75), Colors.transparent],
+                      colors: [Colors.black.withValues(alpha: 0.75), Colors.transparent],
                     ),
                   ),
                   child: Row(children: [
@@ -950,16 +957,16 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     children: [
       Icon(icon, size: 11, color: color),
       const SizedBox(width: 4),
-      Text(label, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+      Text(label, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
     ],
   );
 
   void _openFullMap(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      builder: (_) => const Dialog(
+        insetPadding: EdgeInsets.all(24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
         child: _NetworkMapDialog(vehicles: _fleetVehicles),
       ),
     );
@@ -1072,7 +1079,7 @@ class _NetworkMapDialogState extends State<_NetworkMapDialog> {
                             color: color,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white, width: isSel ? 3 : 2),
-                            boxShadow: [BoxShadow(color: color.withOpacity(0.55), blurRadius: isSel ? 12 : 4)],
+                            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: isSel ? 12 : 4)],
                           ),
                           child: Icon(
                             v['status'] == 'moving' ? Icons.local_shipping
@@ -1101,13 +1108,13 @@ class _NetworkMapDialogState extends State<_NetworkMapDialog> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4))],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4))],
                     ),
                     child: Row(children: [
                       Container(
                         width: 42, height: 42,
                         decoration: BoxDecoration(
-                          color: _statusColor(sel['status'] as String).withOpacity(0.12),
+                          color: _statusColor(sel['status'] as String).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(Icons.local_shipping,
@@ -1165,7 +1172,7 @@ class _NetworkMapDialogState extends State<_NetworkMapDialog> {
 
   Widget _infoChip(IconData icon, String label, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+    decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(icon, size: 12, color: color),
       const SizedBox(width: 4),
@@ -1180,7 +1187,7 @@ class _NetworkMapDialogState extends State<_NetworkMapDialog> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(6),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 4)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)],
       ),
       child: Icon(icon, size: 16, color: const Color(0xFF0F172A)),
     ),

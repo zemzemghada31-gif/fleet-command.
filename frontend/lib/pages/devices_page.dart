@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../constants.dart';
+import '../mock_data.dart';
+import '../services/sync_service.dart';
+
+// Conditional import: web QR scanner on web, stub on native
+import '../widgets/qr_scanner_stub.dart' if (dart.library.html) '../widgets/web_qr_scanner.dart';
 
 // ---------------------------------------------------------------------------
 // Models
@@ -13,6 +21,8 @@ class DeviceModel {
   String assignment;
   String lastConnection;
   final String statusColor;
+  final String assignedVehicle;
+  final String assignedSince;
 
   DeviceModel({
     required this.id,
@@ -20,6 +30,8 @@ class DeviceModel {
     required this.assignment,
     required this.lastConnection,
     required this.statusColor,
+    this.assignedVehicle = '—',
+    this.assignedSince = '—',
   });
 
   factory DeviceModel.fromJson(Map<String, dynamic> j) => DeviceModel(
@@ -28,6 +40,8 @@ class DeviceModel {
         assignment: j['assignment'],
         lastConnection: j['last_connection'],
         statusColor: j['status_color'],
+        assignedVehicle: j['assigned_vehicle'] ?? '—',
+        assignedSince: j['assigned_since'] ?? '—',
       );
 
   Map<String, dynamic> toJson() => {
@@ -36,6 +50,8 @@ class DeviceModel {
         'assignment': assignment,
         'last_connection': lastConnection,
         'status_color': statusColor,
+        'assigned_vehicle': assignedVehicle,
+        'assigned_since': assignedSince,
       };
 }
 
@@ -53,6 +69,7 @@ class _DevicesPageState extends State<DevicesPage> {
   bool _isLoading = true;
   bool _isRegistering = false;
   bool _backendOffline = false;
+  int _pendingSyncCount = 0;
 
   String? _filterAssignment;
   int _currentPage = 1;
@@ -67,12 +84,15 @@ class _DevicesPageState extends State<DevicesPage> {
   static const _assignmentOptions = ['ASSIGNED', 'UNASSIGNED', 'MAINTENANCE'];
 
 
-  static final List<DeviceModel> _mockDevices = [
-    DeviceModel(id: 'X-9941-ALPHA', model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '2 mins ago',      statusColor: '0xFF3B82F6'),
-    DeviceModel(id: 'X-8820-BETA',  model: 'Core Link Hub',    assignment: 'UNASSIGNED',  lastConnection: '14 hrs ago',      statusColor: '0xFF64748B'),
-    DeviceModel(id: 'X-1011-DELTA', model: 'Apex Tracker V3',  assignment: 'MAINTENANCE', lastConnection: 'Offline (3 days)',statusColor: '0xFFF59E0B'),
-    DeviceModel(id: 'X-9950-GAMMA', model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: 'Just now',        statusColor: '0xFF3B82F6'),
-  ];
+  static List<DeviceModel> get _mockDevices => kMockDevices.map((md) => DeviceModel(
+    id: md.id,
+    model: md.model,
+    assignment: md.assignment,
+    lastConnection: md.lastConnection,
+    statusColor: md.statusColor,
+    assignedVehicle: md.assignedVehicle,
+    assignedSince: md.assignedSince,
+  )).toList();
 
 
   List<DeviceModel> get _filtered => _filterAssignment == null
@@ -96,7 +116,7 @@ class _DevicesPageState extends State<DevicesPage> {
   @override
   void initState() {
     super.initState();
-    _fetchDevices();
+    _loadDevicesFromLocal();
   }
 
   @override
@@ -111,21 +131,91 @@ class _DevicesPageState extends State<DevicesPage> {
 
   Future<void> _fetchDevices() async {
     if (!mounted) return;
-    setState(() { _isLoading = true; _backendOffline = false; });
+    // Only show loading spinner if we have no cached data yet
+    if (_devices.isEmpty) {
+      setState(() { _isLoading = true; _backendOffline = false; });
+    }
     try {
       final res = await http
           .get(Uri.parse('$kApiBaseUrl/api/devices'))
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       if (res.statusCode == 200) {
         final list = (json.decode(res.body) as List).map((e) => DeviceModel.fromJson(e)).toList();
         setState(() { _devices = list; _isLoading = false; _backendOffline = false; });
-      } else {
-        _fallbackToMock();
+        await _saveDevicesLocally(list);
+        // Sync pending operations now that backend is reachable
+        await _syncPendingOperations();
       }
     } catch (_) {
-      if (mounted) _fallbackToMock();
+      // Only show offline if we have no cached data at all
+      if (_devices.isEmpty && mounted) {
+        setState(() { _isLoading = false; _backendOffline = true; });
+      }
     }
+    // Update pending count
+    _pendingSyncCount = await SyncService.getPendingCount();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _syncPendingOperations() async {
+    try {
+      await SyncService.processPendingOperations(
+        onCreateDevice: (data) async {
+          final res = await http.post(
+            Uri.parse('$kApiBaseUrl/api/devices'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(data),
+          ).timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) throw Exception('Failed to sync device creation');
+        },
+        onUpdateAssignment: (deviceId, assignment) async {
+          final res = await http.put(
+            Uri.parse('$kApiBaseUrl/api/devices/${Uri.encodeComponent(deviceId)}'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'assignment': assignment}),
+          ).timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) throw Exception('Failed to sync assignment update');
+        },
+        onDeleteDevice: (deviceId) async {
+          final res = await http
+              .delete(Uri.parse('$kApiBaseUrl/api/devices/${Uri.encodeComponent(deviceId)}'))
+              .timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) throw Exception('Failed to sync device deletion');
+        },
+      );
+      final pendingCount = await SyncService.getPendingCount();
+      if (pendingCount == 0 && mounted) {
+        _showSnack('All pending changes synced successfully!');
+      } else if (mounted) {
+        _showSnack('$pendingCount changes still pending sync.', isError: true);
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Sync failed: $e', isError: true);
+    }
+  }
+
+  Future<void> _saveDevicesLocally(List<DeviceModel> devices) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = devices.map((d) => d.toJson()).toList();
+      await prefs.setString('cached_devices', json.encode(jsonList));
+    } catch (_) {}
+  }
+
+  Future<void> _loadDevicesFromLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getString('cached_devices');
+      if (data != null) {
+        final list = (json.decode(data) as List).map((e) => DeviceModel.fromJson(e)).toList();
+        if (mounted) {
+          setState(() { _devices = list; _isLoading = false; _backendOffline = true; });
+          return;
+        }
+      }
+    } catch (_) {}
+    if (mounted) _fallbackToMock();
   }
 
   void _fallbackToMock() {
@@ -148,7 +238,6 @@ class _DevicesPageState extends State<DevicesPage> {
     }
 
     setState(() => _isRegistering = true);
-    final now = DateTime.now();
     final newDevice = DeviceModel(
       id: id,
       model: _selectedModel,
@@ -158,13 +247,15 @@ class _DevicesPageState extends State<DevicesPage> {
     );
 
     if (_backendOffline) {
-      // Offline mode — update local list only
+      // Queue for sync when backend comes back online
+      await SyncService.addOperation(SyncOperationType.createDevice, newDevice.toJson());
       setState(() {
         _devices.add(newDevice);
         _idController.clear();
         _isRegistering = false;
       });
-      _showSnack('Device registered locally (offline mode).');
+      await _saveDevicesLocally(_devices);
+      _showSnack('Device registered locally (will sync when online).');
       return;
     }
 
@@ -173,7 +264,7 @@ class _DevicesPageState extends State<DevicesPage> {
         Uri.parse('$kApiBaseUrl/api/devices'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(newDevice.toJson()),
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 30));
       if (!mounted) return;
 
       if (res.statusCode == 200) {
@@ -186,42 +277,51 @@ class _DevicesPageState extends State<DevicesPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      // Fall back to local add
+      // Queue for sync when backend comes back online
+      await SyncService.addOperation(SyncOperationType.createDevice, newDevice.toJson());
       setState(() {
         _devices.add(newDevice);
         _idController.clear();
         _backendOffline = true;
+        _isRegistering = false;
       });
-      _showSnack('Backend unreachable — device saved locally.', isError: false);
-    } finally {
-      if (mounted) setState(() => _isRegistering = false);
+      await _saveDevicesLocally(_devices);
+      _showSnack('Backend unreachable — device queued for sync.', isError: false);
+      return;
     }
   }
 
   Future<void> _deleteDevice(String deviceId) async {
     if (_backendOffline) {
+      // Queue for sync when backend comes back online
+      await SyncService.addOperation(SyncOperationType.deleteDevice, {'deviceId': deviceId});
       setState(() => _devices.removeWhere((d) => d.id == deviceId));
-      _showSnack('Device "$deviceId" removed.');
+      await _saveDevicesLocally(_devices);
+      _showSnack('Device "$deviceId" removed (will sync when online).');
       return;
     }
     try {
       final res = await http
           .delete(Uri.parse('$kApiBaseUrl/api/devices/${Uri.encodeComponent(deviceId)}'))
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       if (res.statusCode == 200) {
         setState(() => _devices.removeWhere((d) => d.id == deviceId));
+        await _saveDevicesLocally(_devices);
         _showSnack('Device "$deviceId" deleted.');
       } else {
         _showSnack('Delete failed.', isError: true);
       }
     } catch (_) {
       if (!mounted) return;
+      // Queue for sync when backend comes back online
+      await SyncService.addOperation(SyncOperationType.deleteDevice, {'deviceId': deviceId});
       setState(() {
         _devices.removeWhere((d) => d.id == deviceId);
         _backendOffline = true;
       });
-      _showSnack('Deleted locally (backend unreachable).');
+      await _saveDevicesLocally(_devices);
+      _showSnack('Deleted locally (queued for sync).');
     }
   }
 
@@ -238,9 +338,15 @@ class _DevicesPageState extends State<DevicesPage> {
       final i = _devices.indexWhere((d) => d.id == device.id);
       if (i >= 0) _devices[i] = updated;
     });
+    await _saveDevicesLocally(_devices);
 
     if (_backendOffline) {
-      _showSnack('Status updated locally (offline mode).');
+      // Queue for sync when backend comes back online
+      await SyncService.addOperation(SyncOperationType.updateAssignment, {
+        'deviceId': device.id,
+        'assignment': newAssignment,
+      });
+      _showSnack('Status updated locally (will sync when online).');
       return;
     }
     try {
@@ -248,9 +354,17 @@ class _DevicesPageState extends State<DevicesPage> {
         Uri.parse('$kApiBaseUrl/api/devices/${Uri.encodeComponent(device.id)}'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode(updated.toJson()),
-      ).timeout(const Duration(seconds: 6));
+      ).timeout(const Duration(seconds: 30));
     } catch (_) {
-      if (mounted) setState(() => _backendOffline = true);
+      if (mounted) {
+        setState(() => _backendOffline = true);
+        // Queue for sync when backend comes back online
+        await SyncService.addOperation(SyncOperationType.updateAssignment, {
+          'deviceId': device.id,
+          'assignment': newAssignment,
+        });
+        _showSnack('Status updated locally (queued for sync).');
+      }
     }
   }
 
@@ -296,98 +410,276 @@ class _DevicesPageState extends State<DevicesPage> {
   // ---------------------------------------------------------------------------
 
   void _openQrScanDialog() {
-    final qrController = TextEditingController();
+    if (kIsWeb) {
+      _openWebQrScanDialog();
+    } else {
+      _openMobileQrScanDialog();
+    }
+  }
+
+  void _openMobileQrScanDialog() {
+    final controller = MobileScannerController(
+      autoStart: true,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
+    bool hasScanned = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        contentPadding: EdgeInsets.zero,
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // QR viewfinder
-              Container(
-                height: 220,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0F172A),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: EdgeInsets.zero,
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Camera viewfinder
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: SizedBox(
+                    height: 300,
+                    width: double.infinity,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      alignment: Alignment.center,
+                      children: [
+                        MobileScanner(
+                          controller: controller,
+                          overlayBuilder: (context, constraints) => CustomPaint(
+                            size: constraints.biggest,
+                            painter: _QrCornerPainter(),
+                          ),
+                          onDetect: (BarcodeCapture capture) {
+                            if (hasScanned) return;
+                            final barcode = capture.barcodes.firstOrNull;
+                            if (barcode?.rawValue == null || barcode!.rawValue!.isEmpty) return;
+                            final scannedId = barcode.rawValue!.trim().toUpperCase();
+                            if (_devices.any((d) => d.id == scannedId)) {
+                              hasScanned = true;
+                              Navigator.of(dialogCtx).pop();
+                              controller.dispose();
+                              _showSnack('Le code "$scannedId" est déjà dans l\'inventaire.', isError: true);
+                              return;
+                            }
+                            hasScanned = true;
+                            Navigator.of(dialogCtx).pop();
+                            controller.dispose();
+                            // Auto-register device with scanned ID
+                            _idController.text = scannedId;
+                            _registerDevice();
+                          },
+                          errorBuilder: (context, error, child) {
+                            return Center(
+                              child: Text(
+                                'Camera error: ${error.toString()}',
+                                style: const TextStyle(color: Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                child: Center(
-                  child: Stack(
-                    alignment: Alignment.center,
+                // Manual fallback input
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Corner brackets
-                      SizedBox(
-                        width: 140, height: 140,
-                        child: CustomPaint(painter: _QrCornerPainter()),
-                      ),
-                      // Scan line animation
-                      const _ScanLineWidget(),
-                      const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.qr_code_2, size: 60, color: Colors.white24),
-                          SizedBox(height: 8),
-                          Text('Align QR code within frame', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                        ],
+                      const Text('OR ENTER ID MANUALLY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                      const SizedBox(height: 10),
+                      TextField(
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          hintText: 'e.g. X-9941-ALPHA',
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          prefixIcon: const Icon(Icons.qr_code, size: 18, color: Color(0xFF64748B)),
+                        ),
+                        onSubmitted: (value) {
+                          final scannedId = value.trim().toUpperCase();
+                          if (scannedId.isNotEmpty) {
+                            if (_devices.any((d) => d.id == scannedId)) {
+                              _showSnack('Le code "$scannedId" est déjà dans l\'inventaire.', isError: true);
+                              return;
+                            }
+                            Navigator.pop(dialogCtx);
+                            controller.dispose();
+                            // Auto-register device with entered ID
+                            _idController.text = scannedId;
+                            _registerDevice();
+                          }
+                        },
                       ),
                     ],
                   ),
                 ),
-              ),
-              // Manual fallback input
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('OR ENTER ID MANUALLY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1)),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: qrController,
-                      autofocus: true,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. X-9941-ALPHA',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        prefixIcon: const Icon(Icons.qr_code, size: 18, color: Color(0xFF64748B)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              final scannedId = qrController.text.trim().toUpperCase();
-              Navigator.pop(ctx);
-              if (scannedId.isNotEmpty) {
-                setState(() => _idController.text = scannedId);
-                _showSnack('QR scanned: $scannedId — review and click Register.');
-              }
-            },
-            icon: const Icon(Icons.check, size: 14),
-            label: const Text('Use This ID'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              elevation: 0,
+              ],
             ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () {
+                controller.dispose();
+                Navigator.pop(dialogCtx);
+              },
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) {
+      try {
+        controller.dispose();
+      } catch (_) {}
+    });
+  }
+
+  void _openWebQrScanDialog() {
+    bool hasScanned = false;
+    bool cameraFailed = false;
+    String? errorMessage;
+    final manualCtrl = TextEditingController();
+
+    void cleanup() {
+      manualCtrl.dispose();
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: EdgeInsets.zero,
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  height: cameraFailed ? 180 : 360,
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: cameraFailed
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.videocam_off, color: Colors.red, size: 48),
+                                const SizedBox(height: 12),
+                                Text(
+                                  errorMessage ?? 'Caméra non disponible',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                ),
+                                const SizedBox(height: 16),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    cameraFailed = false;
+                                    errorMessage = null;
+                                    setDialogState(() {});
+                                  },
+                                  icon: const Icon(Icons.refresh, size: 16, color: Colors.white),
+                                  label: const Text('Réessayer', style: TextStyle(color: Colors.white)),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.white38),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : WebQrScannerWidget(
+                          onScan: (scannedId) {
+                            if (hasScanned) return;
+                            hasScanned = true;
+                            // Vérifier si le device existe déjà
+                            if (_devices.any((d) => d.id == scannedId)) {
+                              cleanup();
+                              Navigator.of(dialogCtx).pop();
+                              _showSnack('Le code "$scannedId" est déjà dans l\'inventaire.', isError: true);
+                              return;
+                            }
+                            cleanup();
+                            Navigator.of(dialogCtx).pop();
+                            _idController.text = scannedId;
+                            _registerDevice();
+                          },
+                          onError: (msg) {
+                            cameraFailed = true;
+                            errorMessage = msg ?? 'Erreur caméra';
+                            setDialogState(() {});
+                          },
+                        ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('OU SAISIR MANUELLEMENT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 1)),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: manualCtrl,
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          hintText: 'e.g. X-9941-ALPHA',
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          prefixIcon: const Icon(Icons.qr_code, size: 18, color: Color(0xFF64748B)),
+                        ),
+                        onSubmitted: (value) {
+                          final scannedId = value.trim().toUpperCase();
+                          if (scannedId.isNotEmpty) {
+                            if (_devices.any((d) => d.id == scannedId)) {
+                              cleanup();
+                              Navigator.pop(dialogCtx);
+                              _showSnack('Le code "$scannedId" est déjà dans l\'inventaire.', isError: true);
+                              return;
+                            }
+                            cleanup();
+                            Navigator.pop(dialogCtx);
+                            _idController.text = scannedId;
+                            _registerDevice();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                cleanup();
+                Navigator.pop(dialogCtx);
+              },
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -472,10 +764,12 @@ class _DevicesPageState extends State<DevicesPage> {
         children: [
           const Icon(Icons.wifi_off, color: Color(0xFFF59E0B), size: 18),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Backend server unreachable — running in offline mode with demo data. Start the server with: python main.py',
-              style: TextStyle(color: Color(0xFF92400E), fontSize: 12),
+              _pendingSyncCount > 0
+                  ? 'Backend offline — $_pendingSyncCount change(s) pending sync. Start server: python main.py'
+                  : 'Backend server unreachable — running in offline mode with demo data. Start the server with: python main.py',
+              style: const TextStyle(color: Color(0xFF92400E), fontSize: 12),
             ),
           ),
           TextButton(
@@ -807,9 +1101,10 @@ class _DevicesPageState extends State<DevicesPage> {
       child: Row(
         children: [
           Expanded(flex: 2, child: Text('DEVICE ID',        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-          Expanded(flex: 2, child: Text('MODEL',            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-          Expanded(flex: 2, child: Text('ASSIGNMENT',       style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
-          Expanded(flex: 2, child: Text('LAST CONNECTION',  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+          Expanded(flex: 1, child: Text('MODEL',            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+          Expanded(flex: 2, child: Text('VEHICLE',          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+          Expanded(flex: 2, child: Text('ASSIGNED SINCE',   style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+          Expanded(flex: 1, child: Text('STATUS',           style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
           SizedBox(width: 60,         child: Text('ACTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
         ],
       ),
@@ -819,6 +1114,7 @@ class _DevicesPageState extends State<DevicesPage> {
   Widget _buildTableRow(DeviceModel d) {
     final badgeColor = _statusBadgeColor(d.assignment);
     final badgeBg    = _statusBadgeBg(d.assignment);
+    final isAssigned = d.assignment == 'ASSIGNED';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
@@ -836,10 +1132,36 @@ class _DevicesPageState extends State<DevicesPage> {
             ),
           ),
           // Model
-          Expanded(flex: 2, child: Text(d.model, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
-          // Assignment badge
+          Expanded(flex: 1, child: Text(d.model, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
+          // Assigned vehicle
           Expanded(
             flex: 2,
+            child: isAssigned
+                ? Row(
+                    children: [
+                      const Icon(Icons.directions_car, size: 14, color: Color(0xFF3B82F6)),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(d.assignedVehicle, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12, fontWeight: FontWeight.w500))),
+                    ],
+                  )
+                : Text(d.assignedVehicle, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+          ),
+          // Assigned since
+          Expanded(
+            flex: 2,
+            child: isAssigned
+                ? Row(
+                    children: [
+                      const Icon(Icons.schedule, size: 14, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Text(d.assignedSince, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                    ],
+                  )
+                : Text(d.assignedSince, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
+          ),
+          // Assignment badge (STATUS)
+          Expanded(
+            flex: 1,
             child: Align(
               alignment: Alignment.centerLeft,
               child: Container(
@@ -849,8 +1171,6 @@ class _DevicesPageState extends State<DevicesPage> {
               ),
             ),
           ),
-          // Last connection
-          Expanded(flex: 2, child: Text(d.lastConnection, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
           // Actions
           SizedBox(
             width: 60,
@@ -1015,8 +1335,8 @@ class _QrCornerPainter extends CustomPainter {
     const len = 24.0;
     final w = size.width; final h = size.height;
     // Top-left
-    canvas.drawLine(Offset(0, len), Offset(0, 0), paint);
-    canvas.drawLine(Offset(0, 0), Offset(len, 0), paint);
+    canvas.drawLine(const Offset(0, len), const Offset(0, 0), paint);
+    canvas.drawLine(const Offset(0, 0), const Offset(len, 0), paint);
     // Top-right
     canvas.drawLine(Offset(w - len, 0), Offset(w, 0), paint);
     canvas.drawLine(Offset(w, 0), Offset(w, len), paint);
@@ -1028,36 +1348,6 @@ class _QrCornerPainter extends CustomPainter {
     canvas.drawLine(Offset(w, h), Offset(w, h - len), paint);
   }
   @override bool shouldRepaint(_) => false;
-}
-
-// Animated scan line
-class _ScanLineWidget extends StatefulWidget {
-  const _ScanLineWidget();
-  @override State<_ScanLineWidget> createState() => _ScanLineState();
-}
-class _ScanLineState extends State<_ScanLineWidget> with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
-    _anim = Tween(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-  }
-  @override void dispose() { _ctrl.dispose(); super.dispose(); }
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) => Positioned(
-        top: 20 + _anim.value * 100,
-        left: 10, right: 10,
-        child: Container(height: 2, decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFF3B82F6).withValues(alpha: 0.8), Colors.transparent]),
-        )),
-      ),
-    );
-  }
 }
 
 // Decorative grid for the map card

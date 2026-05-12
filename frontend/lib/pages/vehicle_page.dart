@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../constants.dart';
+import '../mock_data.dart';
+import '../services/sync_service.dart';
 
 // ---------------------------------------------------------------------------
 // Model
@@ -73,14 +76,20 @@ class _VehiclePageState extends State<VehiclePage> {
 
   static const _statusOptions  = ['ACTIVE', 'MAINTENANCE', 'IDLE'];
   static const _statusFilters  = ['ALL', 'ACTIVE', 'MAINTENANCE', 'IDLE'];
-  static const _trackerOptions = ['Not Assigned', 'ST-449-ALPHA', 'ST-112-BETA', 'ST-889-GAMMA', 'ST-221-DELTA'];
+  // Offline mock data — sourced from mock_data.dart central repository
+  static final List<String> _trackerOptions = () {
+    final assigned = kMockDevices.where((d) => d.assignment == 'ASSIGNED').map((d) => d.id).toList();
+    final unassigned = kMockDevices.where((d) => d.assignment == 'UNASSIGNED').map((d) => d.id).toList();
+    return ['Not Assigned', ...unassigned, ...assigned];
+  }();
 
-  // Offline mock data
-  static final _mock = [
-    Vehicle(id: 1, model: 'Tesla Model X',      plate: 'BT-904-TX',  status: 'ACTIVE',       tracker: 'ST-449-ALPHA'),
-    Vehicle(id: 2, model: 'Mercedes Sprinter',  plate: 'CA-123-VN',  status: 'MAINTENANCE',  tracker: 'Not Assigned'),
-    Vehicle(id: 3, model: 'Ford Transit XL',    plate: 'TX-4409-LP', status: 'IDLE',         tracker: 'ST-112-BETA'),
-  ];
+  static List<Vehicle> get _mock => kMockVehicles.map((mv) => Vehicle(
+    id: mv.id,
+    model: mv.model,
+    plate: mv.plate,
+    status: mv.status,
+    tracker: mv.tracker,
+  )).toList();
 
   // ---------------------------------------------------------------------------
   // Computed
@@ -111,7 +120,10 @@ class _VehiclePageState extends State<VehiclePage> {
   @override
   void initState() {
     super.initState();
-    _fetchVehicles();
+    _loadVehiclesFromLocal().then((_) {
+      // Après avoir chargé le cache local, fetch le backend en arrière-plan
+      _fetchVehicles();
+    });
   }
 
   @override
@@ -129,21 +141,91 @@ class _VehiclePageState extends State<VehiclePage> {
 
   Future<void> _fetchVehicles() async {
     if (!mounted) return;
-    setState(() { _isLoading = true; _backendOffline = false; });
+    // Only show loading spinner if we have no cached data yet
+    if (_vehicles.isEmpty) {
+      setState(() { _isLoading = true; _backendOffline = false; });
+    }
     try {
       final res = await http
           .get(Uri.parse('$kApiBaseUrl/api/vehicles'))
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       if (res.statusCode == 200) {
         final list = (json.decode(res.body) as List).map((e) => Vehicle.fromJson(e)).toList();
         setState(() { _vehicles = list; _isLoading = false; });
-      } else {
-        _fallbackToMock();
+        await _saveVehiclesLocally(list);
+        // Sync pending operations now that backend is reachable
+        await _syncPendingOperations();
       }
     } catch (_) {
-      if (mounted) _fallbackToMock();
+      // Only show offline if we have no cached data at all
+      if (_vehicles.isEmpty && mounted) {
+        setState(() { _isLoading = false; _backendOffline = true; });
+      }
     }
+  }
+
+  Future<void> _syncPendingOperations() async {
+    try {
+      await SyncService.processPendingOperations(
+        onCreateDevice: (_) async {},
+        onUpdateAssignment: (_, __) async {},
+        onDeleteDevice: (_) async {},
+        onCreateVehicle: (data) async {
+          final res = await http.post(
+            Uri.parse('$kApiBaseUrl/api/vehicles'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(data),
+          ).timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) throw Exception('Failed to sync vehicle creation');
+        },
+        onUpdateVehicle: (vehicleId, data) async {
+          final res = await http.put(
+            Uri.parse('$kApiBaseUrl/api/vehicles/$vehicleId'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(data),
+          ).timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) throw Exception('Failed to sync vehicle update');
+        },
+        onDeleteVehicle: (vehicleId) async {
+          final res = await http
+              .delete(Uri.parse('$kApiBaseUrl/api/vehicles/$vehicleId'))
+              .timeout(const Duration(seconds: 30));
+          if (res.statusCode != 200) throw Exception('Failed to sync vehicle deletion');
+        },
+      );
+      final pendingCount = await SyncService.getPendingCount();
+      if (pendingCount == 0 && mounted) {
+        _snack('All pending changes synced successfully!');
+      } else if (mounted) {
+        _snack('$pendingCount changes still pending sync.', error: true);
+      }
+    } catch (e) {
+      if (mounted) _snack('Sync failed: $e', error: true);
+    }
+  }
+
+  Future<void> _saveVehiclesLocally(List<Vehicle> vehicles) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = vehicles.map((v) => v.toJson()).toList();
+      await prefs.setString('cached_vehicles', json.encode(jsonList));
+    } catch (_) {}
+  }
+
+  Future<void> _loadVehiclesFromLocal() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getString('cached_vehicles');
+      if (data != null) {
+        final list = (json.decode(data) as List).map((e) => Vehicle.fromJson(e)).toList();
+        if (mounted) {
+          setState(() { _vehicles = list; _isLoading = false; _backendOffline = true; });
+          return;
+        }
+      }
+    } catch (_) {}
+    if (mounted) _fallbackToMock();
   }
 
   void _fallbackToMock() {
@@ -166,7 +248,7 @@ class _VehiclePageState extends State<VehiclePage> {
     });
 
     if (_backendOffline) {
-      _applyLocalSave(body);
+      await _applyLocalSave(body);
       return;
     }
 
@@ -174,10 +256,10 @@ class _VehiclePageState extends State<VehiclePage> {
       final res = _isEditing
           ? await http.put(Uri.parse('$kApiBaseUrl/api/vehicles/$_editingId'),
               headers: {'Content-Type': 'application/json'}, body: body)
-              .timeout(const Duration(seconds: 6))
+              .timeout(const Duration(seconds: 30))
           : await http.post(Uri.parse('$kApiBaseUrl/api/vehicles'),
               headers: {'Content-Type': 'application/json'}, body: body)
-              .timeout(const Duration(seconds: 6));
+              .timeout(const Duration(seconds: 30));
 
       if (!mounted) return;
       if (res.statusCode == 200) {
@@ -188,13 +270,13 @@ class _VehiclePageState extends State<VehiclePage> {
         _snack('Save failed (${res.statusCode}).', error: true);
       }
     } catch (_) {
-      if (mounted) _applyLocalSave(body);
+      if (mounted) await _applyLocalSave(body);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  void _applyLocalSave(String body) {
+  Future<void> _applyLocalSave(String body) async {
     final data = json.decode(body);
     final v = Vehicle(
       id:      data['id'],
@@ -203,6 +285,15 @@ class _VehiclePageState extends State<VehiclePage> {
       status:  data['status'],
       tracker: data['tracker'],
     );
+
+    if (_isEditing) {
+      // Queue update for sync
+      await SyncService.addOperation(SyncOperationType.updateVehicle, data);
+    } else {
+      // Queue creation for sync
+      await SyncService.addOperation(SyncOperationType.createVehicle, data);
+    }
+
     setState(() {
       if (_isEditing) {
         final i = _vehicles.indexWhere((x) => x.id == _editingId);
@@ -213,8 +304,9 @@ class _VehiclePageState extends State<VehiclePage> {
       _backendOffline = true;
       _isSaving = false;
     });
+    await _saveVehiclesLocally(_vehicles);
     _clearForm();
-    _snack(_isEditing ? 'Vehicle updated locally.' : 'Vehicle registered locally (offline).');
+    _snack(_isEditing ? 'Vehicle updated locally (will sync when online).' : 'Vehicle registered locally (will sync when online).');
   }
 
   Future<void> _deleteVehicle(Vehicle v) async {
@@ -237,8 +329,11 @@ class _VehiclePageState extends State<VehiclePage> {
     if (ok != true || !mounted) return;
 
     if (_backendOffline) {
+      // Queue for sync when backend comes back online
+      await SyncService.addOperation(SyncOperationType.deleteVehicle, {'id': v.id});
       setState(() => _vehicles.removeWhere((x) => x.id == v.id));
-      _snack('Vehicle deleted locally.');
+      await _saveVehiclesLocally(_vehicles);
+      _snack('Vehicle deleted locally (will sync when online).');
       return;
     }
     try {
@@ -255,45 +350,17 @@ class _VehiclePageState extends State<VehiclePage> {
       }
     } catch (_) {
       if (mounted) {
+        // Queue for sync when backend comes back online
+        await SyncService.addOperation(SyncOperationType.deleteVehicle, {'id': v.id});
         setState(() { _vehicles.removeWhere((x) => x.id == v.id); _backendOffline = true; });
-        _snack('Deleted locally (offline).');
+        await _saveVehiclesLocally(_vehicles);
+        _snack('Vehicle deleted locally (queued for sync).');
       }
     }
   }
 
-  void _startEdit(Vehicle v) {
-    setState(() {
-      _editingId    = v.id;
-      _modelCtrl.text = v.model;
-      _plateCtrl.text = v.plate;
-      _yearCtrl.text  = v.year;
-      _notesCtrl.text = v.notes;
-      _formStatus   = v.status;
-      _formTracker  = v.tracker == 'Not Assigned' ? null : v.tracker;
-    });
-  }
-
-  void _clearForm() {
-    setState(() {
-      _editingId = null;
-      _modelCtrl.clear();
-      _plateCtrl.clear();
-      _yearCtrl.clear();
-      _notesCtrl.clear();
-      _formStatus  = 'ACTIVE';
-      _formTracker = null;
-      _isSaving    = false;
-    });
-  }
-
-  void _snack(String msg, {bool error = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: error ? Colors.red.shade700 : const Color(0xFF0F172A),
-    ));
-  }
-
+  // ---------------------------------------------------------------------------
+  // UI helpers
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
@@ -342,33 +409,6 @@ class _VehiclePageState extends State<VehiclePage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Offline banner
-  // ---------------------------------------------------------------------------
-
-  Widget _buildOfflineBanner() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.wifi_off, color: Color(0xFFF59E0B), size: 16),
-          const SizedBox(width: 10),
-          const Expanded(child: Text('Offline mode — demo data. Run: python main.py', style: TextStyle(color: Color(0xFF92400E), fontSize: 12))),
-          TextButton(
-            onPressed: _fetchVehicles,
-            child: const Text('Retry', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
   // Page header
   // ---------------------------------------------------------------------------
 
@@ -409,7 +449,7 @@ class _VehiclePageState extends State<VehiclePage> {
   Widget _buildStatsRow() {
     return Row(
       children: [
-        _buildStatCard('TOTAL FLEET',  _vehicles.length.toString(), Icons.directions_car,   const Color(0xFF6366F1)),
+        _buildStatCard('TOTAL FLEET',  _vehicles.length.toString(), Icons.local_shipping,   const Color(0xFF6366F1)),
         const SizedBox(width: 16),
         _buildStatCard('ACTIVE',       _activeCount.toString(),      Icons.check_circle,     const Color(0xFF22C55E)),
         const SizedBox(width: 16),
@@ -584,7 +624,7 @@ class _VehiclePageState extends State<VehiclePage> {
                 Container(
                   width: 42, height: 42,
                   decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
-                  child: Icon(Icons.directions_car, color: sc, size: 22),
+                  child: Icon(Icons.local_shipping, color: sc, size: 22),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -692,7 +732,7 @@ class _VehiclePageState extends State<VehiclePage> {
           // Plate
           _fieldLabel('PLATE NUMBER'),
           const SizedBox(height: 6),
-          _textField(_plateCtrl, 'e.g. TX-4409-LP'),
+          _textField(_plateCtrl, 'e.g. DXB-4400-LP'),
           const SizedBox(height: 14),
 
           // Year
@@ -859,6 +899,68 @@ class _VehiclePageState extends State<VehiclePage> {
           Icon(icons[status] ?? Icons.circle, size: 12, color: c),
           const SizedBox(width: 5),
           Text(status, style: TextStyle(color: c, fontWeight: FontWeight.w600, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helper methods
+  // ---------------------------------------------------------------------------
+
+  void _snack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(fontSize: 12)),
+        backgroundColor: error ? Colors.red : const Color(0xFF22C55E),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _clearForm() {
+    _modelCtrl.clear();
+    _plateCtrl.clear();
+    _yearCtrl.clear();
+    _notesCtrl.clear();
+    setState(() {
+      _editingId = null;
+      _formStatus = 'ACTIVE';
+      _formTracker = null;
+    });
+  }
+
+  void _startEdit(Vehicle v) {
+    setState(() {
+      _editingId = v.id;
+      _modelCtrl.text = v.model;
+      _plateCtrl.text = v.plate;
+      _yearCtrl.text = v.year;
+      _notesCtrl.text = v.notes;
+      _formStatus = v.status;
+      _formTracker = v.tracker;
+    });
+  }
+
+  Widget _buildOfflineBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wifi_off, color: Color(0xFFF59E0B), size: 16),
+          const SizedBox(width: 10),
+          const Expanded(child: Text('Offline mode — demo data. Run: python main.py', style: TextStyle(color: Color(0xFF92400E), fontSize: 12))),
+          TextButton(
+            onPressed: _fetchVehicles,
+            child: const Text('Retry', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
         ],
       ),
     );

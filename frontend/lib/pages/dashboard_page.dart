@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../mock_data.dart';
 import '../constants.dart';
 
 // ---------------------------------------------------------------------------
@@ -103,14 +104,48 @@ class _DashboardPageState extends State<DashboardPage>
   final MapController _mapController = MapController();
   final _rnd = Random();
 
-  // ─── Mock data with real GPS coordinates ─────────────────────────────────
-  static final _mock = [
-    const LiveVehicle(id: 'TX-0912-A', location: 'Interstate 90, Chicago IL',   status: 'MOVING',      speed: 68.0, fuel: 92, driver: 'Marcus Reed',   eta: '4.2H TO GO',  heading: 'NE', speedHistory: [62,65,68,70,67,69,68,71,66,68], lat: 41.8781, lng: -87.6298),
-    const LiveVehicle(id: 'NY-8271-C', location: 'South Bay Distribution Ctr',  status: 'IDLE',        speed:  0.0, fuel: 44, driver: 'Sarah Kim',     eta: 'OFFLOADING',  heading: '—',  speedHistory: [0,0,0,0,0,0,0,0,0,0],           lat: 37.3382, lng: -121.8863),
-    const LiveVehicle(id: 'FL-1102-K', location: 'Service Hub Station #4',      status: 'MAINTENANCE', speed:  0.0, fuel: 31, driver: 'James Wu',      eta: 'IN SERVICE',  heading: '—',  speedHistory: [0,0,0,0,0,0,0,0,0,0],           lat: 27.9506, lng: -82.4572),
-    const LiveVehicle(id: 'CA-5501-M', location: 'US-101, San Francisco CA',    status: 'MOVING',      speed: 54.0, fuel: 67, driver: 'Elena Torres',  eta: '1.8H TO GO',  heading: 'S',  speedHistory: [48,51,54,52,55,56,53,54,57,54], lat: 37.7749, lng: -122.4194),
-    const LiveVehicle(id: 'TX-3302-B', location: 'Dallas Fort Worth Depot',     status: 'IDLE',        speed:  0.0, fuel: 88, driver: 'Kevin Park',    eta: 'LOADING',     heading: '—',  speedHistory: [0,0,0,0,0,0,0,0,0,0],           lat: 32.8998, lng: -97.0403),
-  ];
+  // ─── Mock data sourced from mock_data.dart central repository ─────────────
+  static String _locationForVehicle(double lat, double lng) {
+    if (lat > 41.5 && lat < 42.5 && lng > -88 && lng < -87) return 'Interstate 90, Chicago IL';
+    if (lat > 37 && lat < 38 && lng > -122.5 && lng < -121.5) return 'US-101, San Francisco CA';
+    if (lat > 37.5 && lat < 38 && lng > -122.5 && lng < -121.5) return 'South Bay Distribution Ctr';
+    if (lat > 25 && lat < 26 && lng > -81 && lng < -80) return 'Miami Logistics Terminal';
+    if (lat > 51 && lat < 52 && lng > -0.5 && lng < 0.5) return 'London Distribution Hub';
+    if (lat > 48 && lat < 49 && lng > 2 && lng < 3) return 'Paris Nord Depot';
+    if (lat > 45.5 && lat < 46 && lng > 4.5 && lng < 5) return 'A6 Highway, Lyon';
+    if (lat > 43 && lat < 44 && lng > 1 && lng < 2) return 'Toulouse Cargo Center';
+    if (lat > 52 && lat < 53 && lng > 13 && lng < 14) return 'Berlin Logistics Hub';
+    if (lat > 41.5 && lat < 42.5 && lng > 12 && lng < 13) return 'Rome Freight Terminal';
+    if (lat > 35 && lat < 36 && lng > 139 && lng < 140) return 'Tokyo Bay Depot';
+    if (lat > 51 && lat < 52 && lng > 0 && lng < 0.5) return 'London East End Depot';
+    if (lat > 37.5 && lat < 38 && lng > 126.5 && lng < 127.5) return 'Seoul Logistics Center';
+    if (lat > -34 && lat < -33 && lng > 151 && lng < 152) return 'Sydney Freight Terminal';
+    if (lat > 39.5 && lat < 40 && lng > -105 && lng < -104) return 'I-25, Denver CO';
+    if (lat > 46 && lat < 47 && lng > 4.5 && lng < 5) return 'A6, Lyon Paris';
+    return '${lat.toStringAsFixed(1)}°N, ${lng.toStringAsFixed(1)}°E';
+  }
+
+  static List<LiveVehicle> _buildMockFromCentral() {
+    return kMockVehicles.map((mv) {
+      final rng = Random(mv.id * 7 + 13);
+      final speedHistory = mv.speed > 0
+          ? List.generate(10, (i) => (mv.speed + rng.nextDouble() * 10 - 5).clamp(0, 120))
+          : List.filled(10, 0.0);
+      return LiveVehicle(
+        id: mv.plate,
+        location: _locationForVehicle(mv.lat, mv.lng),
+        status: mv.status == 'ACTIVE' ? 'MOVING' : mv.status,
+        speed: mv.speed,
+        fuel: mv.fuel,
+        driver: mv.driver,
+        eta: mv.eta,
+        heading: mv.heading,
+        speedHistory: speedHistory.cast<double>(),
+        lat: mv.lat,
+        lng: mv.lng,
+      );
+    }).toList();
+  }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
   @override
@@ -147,7 +182,7 @@ class _DashboardPageState extends State<DashboardPage>
     try {
       final res = await http
           .get(Uri.parse('$kApiBaseUrl/api/live'))
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 30));
       if (res.statusCode == 200 && mounted) {
         final list = jsonDecode(res.body) as List;
         setState(() {
@@ -158,7 +193,7 @@ class _DashboardPageState extends State<DashboardPage>
         return;
       }
     } catch (_) {}
-    if (mounted) setState(() { _vehicles = List.from(_mock); _backendOffline = true; });
+    if (mounted) setState(() { _vehicles = _buildMockFromCentral(); _backendOffline = true; });
   }
 
   void _refreshData() {
@@ -303,16 +338,8 @@ class _DashboardPageState extends State<DashboardPage>
   @override
   Widget build(BuildContext context) {
     return Stack(children: [
-      // ── Background: real OSM map when tracking, static image otherwise ──
-      if (_isTracking && _selectedVehicle != null)
-        _buildLiveMap(_selectedVehicle!)
-      else
-        Container(
-          width: double.infinity, height: double.infinity,
-          decoration: const BoxDecoration(
-            image: DecorationImage(image: AssetImage('assets/images/mon_fond.jpg'), fit: BoxFit.cover),
-          ),
-        ),
+      // ── Background: real OSM map ──
+      _buildBackgroundMap(),
 
       // ── Search bar (hidden during tracking to keep map clean) ──
       if (!_isTracking)
@@ -325,7 +352,7 @@ class _DashboardPageState extends State<DashboardPage>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
               ),
               child: Row(children: [
                 const Icon(Icons.search, color: Colors.grey),
@@ -346,13 +373,13 @@ class _DashboardPageState extends State<DashboardPage>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
               ),
               child: Tooltip(
                 message: 'Auto-refresh every 5s',
                 child: AnimatedBuilder(
                   animation: _pulseAnim,
-                  builder: (_, __) => Icon(Icons.wifi_tethering, color: Colors.blue.withOpacity(_pulseAnim.value), size: 22),
+                  builder: (_, __) => Icon(Icons.wifi_tethering, color: Colors.blue.withValues(alpha: _pulseAnim.value), size: 22),
                 ),
               ),
             ),
@@ -366,7 +393,7 @@ class _DashboardPageState extends State<DashboardPage>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFF0F172A).withOpacity(0.85),
+              color: const Color(0xFF0F172A).withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(children: [
@@ -404,7 +431,111 @@ class _DashboardPageState extends State<DashboardPage>
     ]);
   }
 
+  // ─── Background OpenStreetMap ─────────────────────────────────────────────
+  Widget _buildBackgroundMap() {
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: const LatLng(39.8283, -98.5795),
+        initialZoom: 3.8,
+        onMapReady: () => setState(() => _mapInitialized = true),
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.fleet.command',
+        ),
+        if (_routeHistory.length > 1)
+          PolylineLayer(polylines: [
+            Polyline(
+              points: _routeHistory,
+              color: Colors.black.withValues(alpha: 0.15),
+              strokeWidth: 10,
+            ),
+            Polyline(
+              points: _routeHistory,
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.7),
+              strokeWidth: 6,
+            ),
+            Polyline(
+              points: _routeHistory,
+              color: const Color(0xFF60A5FA).withValues(alpha: 0.5),
+              strokeWidth: 2,
+            ),
+          ]),
+        if (_routeHistory.length > 1)
+          MarkerLayer(markers: [
+            Marker(
+              point: _routeHistory.first,
+              width: 16, height: 16,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4)],
+                ),
+                child: const Icon(Icons.trip_origin, color: Colors.white, size: 8),
+              ),
+            ),
+          ]),
+        if (_vehicles.isNotEmpty)
+          MarkerLayer(markers: [
+            for (final v in _vehicles)
+              Marker(
+                point: LatLng(v.lat, v.lng),
+                width: v.id == _selectedId && _isTracking ? 48 : 28,
+                height: v.id == _selectedId && _isTracking ? 48 : 28,
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    _selectedId = v.id;
+                    _isTracking = false;
+                  }),
+                  child: v.id == _selectedId && _isTracking
+                      ? AnimatedBuilder(
+                          animation: _pulseAnim,
+                          builder: (_, __) => Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 24 + _pulseAnim.value * 8,
+                                height: 24 + _pulseAnim.value * 8,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF3B82F6),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(color: const Color(0xFF3B82F6).withValues(alpha: 0.4), blurRadius: 12),
+                                  ],
+                                ),
+                                child: const Icon(Icons.navigation, color: Colors.white, size: 14),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: _statusColor(v.status),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4),
+                            ],
+                          ),
+                          child: const Icon(Icons.local_shipping, color: Colors.white, size: 12),
+                        ),
+                ),
+              ),
+          ]),
+      ],
+    );
+  }
+
   // ─── Real OpenStreetMap ───────────────────────────────────────────────────
+  // ignore: unused_element
   Widget _buildLiveMap(LiveVehicle selected) {
     return FlutterMap(
       mapController: _mapController,
@@ -423,7 +554,7 @@ class _DashboardPageState extends State<DashboardPage>
           PolylineLayer(polylines: [
             Polyline(
               points: _routeHistory,
-              color: const Color(0xFF3B82F6).withOpacity(0.75),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.75),
               strokeWidth: 4,
             ),
           ]),
@@ -448,7 +579,7 @@ class _DashboardPageState extends State<DashboardPage>
         builder: (_, __) => Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: _statusColor(v.status).withOpacity(0.15 + _pulseAnim.value * 0.15),
+            color: _statusColor(v.status).withValues(alpha: 0.15 + _pulseAnim.value * 0.15),
           ),
           child: Center(
             child: Container(
@@ -457,7 +588,7 @@ class _DashboardPageState extends State<DashboardPage>
                 color: _statusColor(v.status),
                 shape: BoxShape.circle,
                 boxShadow: [BoxShadow(
-                  color: _statusColor(v.status).withOpacity(0.5),
+                  color: _statusColor(v.status).withValues(alpha: 0.5),
                   blurRadius: 8 + _pulseAnim.value * 6,
                   spreadRadius: 2,
                 )],
@@ -488,7 +619,7 @@ class _DashboardPageState extends State<DashboardPage>
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 20)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20)],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -503,7 +634,7 @@ class _DashboardPageState extends State<DashboardPage>
                   width: 8, height: 8,
                   decoration: BoxDecoration(
                     color: v.status == 'MOVING'
-                        ? Colors.blue.withOpacity(_pulseAnim.value)
+                        ? Colors.blue.withValues(alpha: _pulseAnim.value)
                         : _statusColor(v.status),
                     shape: BoxShape.circle,
                   ),
@@ -513,7 +644,7 @@ class _DashboardPageState extends State<DashboardPage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _statusColor(v.status).withOpacity(0.1),
+                  color: _statusColor(v.status).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(v.status, style: TextStyle(color: _statusColor(v.status), fontSize: 10, fontWeight: FontWeight.bold)),
@@ -563,7 +694,7 @@ class _DashboardPageState extends State<DashboardPage>
                     builder: (_, __) => Container(
                       width: 6, height: 6,
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(_pulseAnim.value),
+                        color: Colors.red.withValues(alpha: _pulseAnim.value),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -594,9 +725,9 @@ class _DashboardPageState extends State<DashboardPage>
       key: key,
       width: 380,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20)],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
@@ -610,7 +741,7 @@ class _DashboardPageState extends State<DashboardPage>
                   builder: (_, __) => Container(
                     width: 8, height: 8,
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(_pulseAnim.value),
+                      color: Colors.blue.withValues(alpha: _pulseAnim.value),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -664,7 +795,7 @@ class _DashboardPageState extends State<DashboardPage>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20)],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 20)],
       ),
       child: Column(children: [
         // ── Dark header ──
@@ -687,7 +818,7 @@ class _DashboardPageState extends State<DashboardPage>
                   builder: (_, __) => Container(
                     width: 8, height: 8,
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(_pulseAnim.value),
+                      color: Colors.red.withValues(alpha: _pulseAnim.value),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -711,9 +842,9 @@ class _DashboardPageState extends State<DashboardPage>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _statusColor(v.status).withOpacity(0.2),
+                  color: _statusColor(v.status).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _statusColor(v.status).withOpacity(0.5)),
+                  border: Border.all(color: _statusColor(v.status).withValues(alpha: 0.5)),
                 ),
                 child: Text(v.status, style: GoogleFonts.inter(color: _statusColor(v.status), fontSize: 11, fontWeight: FontWeight.bold)),
               ),
@@ -732,7 +863,7 @@ class _DashboardPageState extends State<DashboardPage>
                   icon: Icons.speed,
                   iconColor: Colors.blue,
                   label: 'SPEED',
-                  value: '${v.speed.toStringAsFixed(0)}',
+                  value: v.speed.toStringAsFixed(0),
                   unit: 'mph',
                 )),
                 const SizedBox(width: 12),
@@ -849,7 +980,7 @@ class _DashboardPageState extends State<DashboardPage>
                             strokeColor: Colors.transparent,
                           ),
                         ),
-                        belowBarData: BarAreaData(show: true, color: const Color(0xFF3B82F6).withOpacity(0.08)),
+                        belowBarData: BarAreaData(show: true, color: const Color(0xFF3B82F6).withValues(alpha: 0.08)),
                       )],
                     )),
                   ),
@@ -968,10 +1099,10 @@ class _DashboardPageState extends State<DashboardPage>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _statusColor(v.status).withOpacity(0.08),
+                color: _statusColor(v.status).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.directions_car, size: 20, color: _statusColor(v.status)),
+              child: Icon(Icons.local_shipping, size: 20, color: _statusColor(v.status)),
             ),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -985,7 +1116,7 @@ class _DashboardPageState extends State<DashboardPage>
                   builder: (_, __) => Container(
                     width: 7, height: 7,
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(_pulseAnim.value),
+                      color: Colors.blue.withValues(alpha: _pulseAnim.value),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1018,7 +1149,7 @@ class _DashboardPageState extends State<DashboardPage>
                   animation: _pulseAnim,
                   builder: (_, __) => Container(
                     width: 7, height: 7,
-                    decoration: BoxDecoration(color: Colors.red.withOpacity(_pulseAnim.value), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: Colors.red.withValues(alpha: _pulseAnim.value), shape: BoxShape.circle),
                   ),
                 ),
                 label: Text('TRACK LIVE', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold)),
@@ -1173,14 +1304,14 @@ class _RouteDialogContentState extends State<_RouteDialogContent> {
                         child: Container(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.blue.withOpacity(0.18),
+                            color: Colors.blue.withValues(alpha: 0.18),
                           ),
                           child: Center(child: Container(
                             width: 28, height: 28,
                             decoration: BoxDecoration(
                               color: v.status == 'MAINTENANCE' ? Colors.red : Colors.blue,
                               shape: BoxShape.circle,
-                              boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.4), blurRadius: 8)],
+                              boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.4), blurRadius: 8)],
                             ),
                             child: const Icon(Icons.local_shipping, color: Colors.white, size: 15),
                           )),
@@ -1196,7 +1327,7 @@ class _RouteDialogContentState extends State<_RouteDialogContent> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A).withOpacity(0.85),
+color: const Color(0xFF0F172A).withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(children: [
@@ -1226,7 +1357,7 @@ class _RouteDialogContentState extends State<_RouteDialogContent> {
                 Center(child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
+                    color: Colors.white.withValues(alpha: 0.92),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1246,7 +1377,7 @@ class _RouteDialogContentState extends State<_RouteDialogContent> {
   Widget _headerChip(IconData icon, String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.1),
+      color: Colors.white.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1336,7 +1467,7 @@ class _ReportDialogContentState extends State<_ReportDialogContent> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Incident Report', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                 Text('${v.id}  ·  ${v.driver}  ·  INC-${widget.reportNumber.toString().padLeft(4, '0')}',
-                    style: GoogleFonts.inter(color: Colors.white.withOpacity(0.85), fontSize: 11)),
+                    style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
               ])),
               IconButton(
                 icon: const Icon(Icons.close, color: Colors.white),
