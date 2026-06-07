@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../constants.dart';
+import 'dart:math' as math;
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -189,7 +190,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           Text('Export Ready', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ]),
         content: SizedBox(
-          width: 480,
+          width: math.min(MediaQuery.of(context).size.width - 32, 480),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,63 +257,110 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 700;
+        final hp = isMobile ? 16.0 : 32.0;
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(hp),
           child: SizedBox(
-            width: constraints.maxWidth - 64, // 32px padding × 2
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Left Column
+            width: constraints.maxWidth - hp * 2,
+            child: LayoutBuilder(
+              builder: (context, innerConstraints) {
+                final isWide = innerConstraints.maxWidth >= 700;
+                if (isWide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left Column
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Fleet Analytics', style: TextStyle(fontSize: isMobile ? 20 : 28, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                                Text('Global performance metrics and operational efficiency data.', style: TextStyle(color: const Color(0xFF64748B), fontSize: isMobile ? 12 : 14)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Flexible(child: _buildTimeFilter()),
+                        ],
+                      ),
+                      SizedBox(height: isMobile ? 20 : 32),
+                      Row(
+                        children: [
+                          Expanded(child: _buildStatCard('TOTAL DISTANCE', totalDistance, distanceTrend, Icons.gesture, const Color(0xFF3B82F6))),
+                          const SizedBox(width: 20),
+                          Expanded(child: _buildStatCard('AVG FUEL ECONOMY', avgFuelEconomy, fuelTrend, Icons.local_gas_station, const Color(0xFF6366F1))),
+                          const SizedBox(width: 20),
+                          Expanded(child: _buildStatCard('ACTIVE ALERTS', activeAlerts.toString(), 'Urgent', Icons.warning_amber_rounded, const Color(0xFFF59E0B))),
+                        ],
+                      ),
+                      SizedBox(height: isMobile ? 20 : 32),
+                      _buildUtilizationChart(),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 32),
+                // Right Column
                 Expanded(
-                  flex: 3,
+                  flex: 1,
                   child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildRefineDataPanel(),
+                      const SizedBox(height: 24),
+                      _buildNetworkMapCard(),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          } else {
+            return Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Fleet Analytics', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          Text('Global performance metrics and operational efficiency data.', style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+                          Text('Fleet Analytics', style: TextStyle(fontSize: isMobile ? 20 : 28, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                          Text('Global performance metrics and operational efficiency data.', style: TextStyle(color: const Color(0xFF64748B), fontSize: isMobile ? 12 : 14)),
                         ],
                       ),
                     ),
                     const SizedBox(width: 16),
-                    _buildTimeFilter(),
+                    Flexible(child: _buildTimeFilter()),
                   ],
                 ),
-                const SizedBox(height: 32),
-                Row(
+                SizedBox(height: isMobile ? 20 : 32),
+                // Stack stat cards vertically on narrow screens
+                Column(
                   children: [
                     _buildStatCard('TOTAL DISTANCE', totalDistance, distanceTrend, Icons.gesture, const Color(0xFF3B82F6)),
-                    const SizedBox(width: 20),
+                    const SizedBox(height: 12),
                     _buildStatCard('AVG FUEL ECONOMY', avgFuelEconomy, fuelTrend, Icons.local_gas_station, const Color(0xFF6366F1)),
-                    const SizedBox(width: 20),
+                    const SizedBox(height: 12),
                     _buildStatCard('ACTIVE ALERTS', activeAlerts.toString(), 'Urgent', Icons.warning_amber_rounded, const Color(0xFFF59E0B)),
                   ],
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: isMobile ? 20 : 32),
                 _buildUtilizationChart(),
-              ],
-            ),
-          ),
-          const SizedBox(width: 32),
-          // Right Column
-          Expanded(
-            flex: 1,
-            child: Column(
-              children: [
+                SizedBox(height: isMobile ? 16 : 24),
                 _buildRefineDataPanel(),
-                const SizedBox(height: 24),
+                SizedBox(height: isMobile ? 16 : 24),
                 _buildNetworkMapCard(),
               ],
-            ),
-          ),
-        ],
+            );
+          }
+        },
       ),
       ),
     );
@@ -371,74 +419,71 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
 
   Widget _buildStatCard(String title, String value, String trend, IconData icon, Color color) {
     final isPositive = trend.contains('+');
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        // Always render the same Column structure — avoids render-box-no-size during loading transitions
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                if (!isLoading)
-                  Flexible(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (trend != 'Urgent' && trend.isNotEmpty)
-                          Icon(isPositive ? Icons.trending_up : Icons.trending_down,
-                              color: isPositive ? Colors.green : Colors.red, size: 14),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            trend,
-                            style: TextStyle(
-                              color: trend == 'Urgent' ? Colors.orange : (isPositive ? Colors.green : Colors.red),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(title, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-            const SizedBox(height: 8),
-            isLoading
-                ? Container(
-                    height: 24,
-                    width: 100,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  )
-                : Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            const SizedBox(height: 12),
-            Container(
-              height: 4,
-              width: 80,
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(2)),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: 0.6,
-                child: Container(decoration: BoxDecoration(color: isLoading ? const Color(0xFFCBD5E1) : color, borderRadius: BorderRadius.circular(2))),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, color: color, size: 22),
               ),
+              if (!isLoading)
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (trend != 'Urgent' && trend.isNotEmpty)
+                        Icon(isPositive ? Icons.trending_up : Icons.trending_down,
+                            color: isPositive ? Colors.green : Colors.red, size: 14),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          trend,
+                          style: TextStyle(
+                            color: trend == 'Urgent' ? Colors.orange : (isPositive ? Colors.green : Colors.red),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(title, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          const SizedBox(height: 8),
+          isLoading
+              ? Container(
+                  height: 24,
+                  width: 100,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                )
+              : Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const SizedBox(height: 12),
+          Container(
+            height: 4,
+            width: 80,
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(2)),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: 0.6,
+              child: Container(decoration: BoxDecoration(color: isLoading ? const Color(0xFFCBD5E1) : color, borderRadius: BorderRadius.circular(2))),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -470,13 +515,15 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                   ),
                 ]),
               ),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                _buildLegendItem('Active', const Color(0xFF0F172A)),
-                const SizedBox(width: 16),
-                _buildLegendItem('Maintenance', const Color(0xFFE2E8F0)),
-                const SizedBox(width: 16),
-                const Icon(Icons.more_vert, color: Colors.grey),
-              ]),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                children: [
+                  _buildLegendItem('Active', const Color(0xFF0F172A)),
+                  _buildLegendItem('Maintenance', const Color(0xFFE2E8F0)),
+                  const Icon(Icons.more_vert, color: Colors.grey),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 40),
@@ -916,26 +963,27 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                       colors: [Colors.black.withValues(alpha: 0.75), Colors.transparent],
                     ),
                   ),
-                  child: Row(children: [
-                    _statusPill(Icons.local_shipping, '$moving Moving', const Color(0xFF3B82F6)),
-                    const SizedBox(width: 8),
-                    _statusPill(Icons.local_parking, '$parked Parked', const Color(0xFF94A3B8)),
-                    const SizedBox(width: 8),
-                    _statusPill(Icons.build, '$service Service', const Color(0xFFF59E0B)),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6),
-                        borderRadius: BorderRadius.circular(8),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    children: [
+                      _statusPill(Icons.local_shipping, '$moving Moving', const Color(0xFF3B82F6)),
+                      _statusPill(Icons.local_parking, '$parked Parked', const Color(0xFF94A3B8)),
+                      _statusPill(Icons.build, '$service Service', const Color(0xFFF59E0B)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.fullscreen, color: Colors.white, size: 13),
+                          SizedBox(width: 4),
+                          Text('Expand', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ]),
                       ),
-                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.fullscreen, color: Colors.white, size: 13),
-                        SizedBox(width: 4),
-                        Text('Expand', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                      ]),
-                    ),
-                  ]),
+                    ],
+                  ),
                 ),
               ),
             ],

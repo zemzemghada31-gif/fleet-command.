@@ -1,1 +1,1 @@
-const String kApiBaseUrl = 'http://10.127.90.206:8000';
+const String kApiBaseUrl = 'http://localhost:8000';

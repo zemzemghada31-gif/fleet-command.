@@ -172,6 +172,9 @@ class _WebQrScannerWidgetState extends State<WebQrScannerWidget> {
             'Acces camera refuse. Autorisez la camera dans les parametres du navigateur.');
       } else if (msg.contains('NotFound')) {
         _setError('Aucune camera trouvee sur cet appareil.');
+      } else if (msg.contains('NotReadable') || msg.contains('could not start video source')) {
+        _setError(
+            'Caméra utilisée par une autre application (Zoom, Teams...). Fermez-la ou utilisez la saisie manuelle.');
       } else {
         _setError(
             'Erreur camera: ${msg.length > 80 ? msg.substring(0, 80) : msg}');

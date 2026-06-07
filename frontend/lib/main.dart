@@ -1,5 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/analytics_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/devices_page.dart';
@@ -12,6 +15,7 @@ import 'pages/users_page.dart';
 import 'pages/access_page.dart';
 import 'pages/delivery_page.dart';
 import 'nav_service.dart';
+import 'l10n/app_localizations.dart';
 
 void main() {
   runApp(const ParkingLoraApp());
@@ -49,14 +53,44 @@ class _AdminData {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class ParkingLoraApp extends StatelessWidget {
+class ParkingLoraApp extends StatefulWidget {
   const ParkingLoraApp({super.key});
+  @override
+  State<ParkingLoraApp> createState() => _ParkingLoraAppState();
+}
+
+class _ParkingLoraAppState extends State<ParkingLoraApp> {
+  Locale _locale = const Locale('en');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocale();
+  }
+
+  Future<void> _loadLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString('app_locale') ?? 'en';
+    if (mounted) setState(() => _locale = Locale(code));
+  }
+
+  void _changeLocale(Locale locale) {
+    setState(() => _locale = locale);
+    SharedPreferences.getInstance().then((prefs) => prefs.setString('app_locale', locale.languageCode));
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Fleet Command - Active Ops',
       debugShowCheckedModeBanner: false,
+      locale: _locale,
+      supportedLocales: const [Locale('en'), Locale('fr'), Locale('ar')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F172A)),
         useMaterial3: true,
@@ -65,14 +99,16 @@ class ParkingLoraApp extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/login': (_) => const LoginPage(),
-        '/home':  (_) => const MainNavigationWrapper(),
+        '/home':  (_) => MainNavigationWrapper(onLocaleChanged: _changeLocale, locale: _locale),
       },
     );
   }
 }
 
 class MainNavigationWrapper extends StatefulWidget {
-  const MainNavigationWrapper({super.key});
+  final void Function(Locale) onLocaleChanged;
+  final Locale locale;
+  const MainNavigationWrapper({super.key, required this.onLocaleChanged, required this.locale});
 
   @override
   State<MainNavigationWrapper> createState() => _MainNavigationWrapperState();
@@ -80,6 +116,7 @@ class MainNavigationWrapper extends StatefulWidget {
 
 class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
   int _selectedIndex = 0;
+  late AppLoc _appLoc;
 
   late final List<Widget> _pages;
 
@@ -97,8 +134,15 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
 
   int get _unreadCount => _notifications.where((n) => !n.read).length;
 
-  static const _pageTitles  = ['Analytics',    'Live Dashboard', 'Devices',       'Vehicles',         'Trajectory',   'Maintenance',   'Livraisons',   'Hist. E/S',    'Access Control',  'Users'];
-  static const _pageSubtitles = ['Fleet Overview', 'Real-time GPS', 'IoT Sensors', 'Fleet Management', 'Route History', 'Service & OBD', 'Arrivées auto', 'Entrée/Sortie', 'Plate & Gate Mgmt', 'User Management'];
+  List<String> get _pageTitles => [
+    _appLoc.home, _appLoc.dashboard, _appLoc.devices, _appLoc.vehicles, _appLoc.trajectory,
+    _appLoc.maintenance, _appLoc.deliveries, _appLoc.history, _appLoc.accessControl, _appLoc.users,
+  ];
+  List<String> get _pageSubtitles => [
+    _appLoc.subAnalytics, _appLoc.subDashboard, _appLoc.subDevices, _appLoc.subVehicles,
+    _appLoc.subTrajectory, _appLoc.subMaintenance, _appLoc.subDeliveries,
+    _appLoc.subHistory, _appLoc.subAccess, _appLoc.subUsers,
+  ];
   static const _pageIcons   = [Icons.analytics_outlined, Icons.dashboard_outlined, Icons.sensors_outlined,
                                 Icons.local_shipping_outlined, Icons.timeline_outlined, Icons.build_outlined, Icons.local_shipping, Icons.swap_horiz_outlined,
                                 Icons.security_outlined, Icons.people_outlined];
@@ -154,17 +198,22 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
             borderRadius: BorderRadius.circular(14),
             shadowColor: Colors.black26,
             child: _SettingsPanel(
+              currentLocale: widget.locale,
+              onLanguageChanged: (l) {
+                widget.onLocaleChanged(l);
+                Navigator.of(ctx).pop();
+              },
               onClose: () => Navigator.of(ctx).pop(),
               onSaved: () {
                 Navigator.of(ctx).pop();
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Row(children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 16),
-                    SizedBox(width: 8),
-                    Text('Settings saved successfully'),
+                    const Icon(Icons.check_circle, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
+                    Text(_appLoc.tr('Settings saved successfully', fr: 'Paramètres enregistrés', ar: 'تم حفظ الإعدادات بنجاح')),
                   ]),
-                  backgroundColor: Color(0xFF0F172A),
-                  duration: Duration(seconds: 2),
+                  backgroundColor: const Color(0xFF0F172A),
+                  duration: const Duration(seconds: 2),
                 ));
               },
             ),
@@ -188,6 +237,7 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
             borderRadius: BorderRadius.circular(14),
             shadowColor: Colors.black26,
             child: _ProfilePanel(
+              appLoc: _appLoc,
               admin: _admin,
               onClose: () => Navigator.of(ctx).pop(),
               onProfileUpdated: (updated) {
@@ -199,14 +249,14 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
                   _admin.phone      = updated.phone;
                   _admin.bio        = updated.bio;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Row(children: [
-                    Icon(Icons.check_circle, color: Colors.white, size: 16),
-                    SizedBox(width: 8),
-                    Text('Profile updated successfully'),
+                    const Icon(Icons.check_circle, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
+                    Text(_appLoc.tr('Profile updated successfully', fr: 'Profil mis à jour', ar: 'تم تحديث الملف الشخصي بنجاح')),
                   ]),
-                  backgroundColor: Color(0xFF3B82F6),
-                  duration: Duration(seconds: 3),
+                  backgroundColor: const Color(0xFF3B82F6),
+                  duration: const Duration(seconds: 3),
                 ));
               },
               onLogout: () {
@@ -214,15 +264,15 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
                 showDialog(
                   context: context,
                   builder: (_) => AlertDialog(
-                    title: const Text('Confirm Logout'),
-                    content: const Text('Are you sure you want to log out of Fleet Command?'),
+                    title: Text(_appLoc.confirmLogout),
+                    content: Text(_appLoc.logoutMessage),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                      TextButton(onPressed: () => Navigator.pop(context), child: Text(_appLoc.cancel)),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                         onPressed: () => Navigator.of(context, rootNavigator: true)
                             .pushNamedAndRemoveUntil('/login', (_) => false),
-                        child: const Text('Logout', style: TextStyle(color: Colors.white)),
+                        child: Text(_appLoc.logout, style: const TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
@@ -237,8 +287,23 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _appLoc = AppLoc(widget.locale);
+  }
+
+  @override
+  void didUpdateWidget(MainNavigationWrapper old) {
+    super.didUpdateWidget(old);
+    if (old.locale != widget.locale) {
+      _appLoc = AppLoc(widget.locale);
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
+    _appLoc = AppLoc(widget.locale);
     _pages = [
       const AnalyticsPage(), const DashboardPage(), const DevicesPage(),
       const VehiclePage(), const TrajectoryPage(), const MaintenancePage(),
@@ -254,70 +319,135 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
-      body: Row(children: [
-        // ── Sidebar ──
-        Container(
-          width: 210,
-          color: Colors.white,
-          child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // Brand
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
-                      borderRadius: BorderRadius.circular(6),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+        final scaffold = Scaffold(
+          backgroundColor: const Color(0xFFF1F5F9),
+          appBar: isMobile
+              ? AppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  scrolledUnderElevation: 1,
+                  leading: Builder(
+                    builder: (drawerContext) => IconButton(
+                      icon: const Icon(Icons.menu, color: Color(0xFF0F172A)),
+                      onPressed: () => Scaffold.of(drawerContext).openDrawer(),
                     ),
-                    child: const Icon(Icons.local_shipping, size: 14, color: Colors.white),
                   ),
-                  const SizedBox(width: 8),
-                  Text('Fleet Command', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF0F172A))),
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.local_shipping, size: 14, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('Fleet Command',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF0F172A))),
+                    ],
+                  ),
+                  actions: [
+                    _TopBarIconButton(
+                      tooltip: 'Notifications',
+                      badge: _unreadCount > 0 ? '' : null,
+                      onTap: _showNotifPanel,
+                      child: const Icon(Icons.notifications_outlined, size: 20, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: _showProfilePanel,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: _buildAvatar(radius: 12, initials: _admin.initials),
+                      ),
+                    ),
+                  ],
+                )
+              : null,
+          drawer: isMobile
+              ? Drawer(
+                  backgroundColor: Colors.white,
+                  child: SafeArea(child: SingleChildScrollView(child: _buildSidebarContent())),
+                )
+              : null,
+          body: isMobile
+              ? Column(children: [
+                  Expanded(child: IndexedStack(index: _selectedIndex, children: _pages)),
+                ])
+              : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  // -- Sidebar (inline) --
+                  Container(
+                    width: 210,
+                    color: Colors.white,
+                    child: SingleChildScrollView(child: _buildSidebarContent()),
+                  ),
+                  // -- Main Content --
+                  Expanded(
+                    child: Column(children: [
+                      _buildTopBar(),
+                      Expanded(child: IndexedStack(index: _selectedIndex, children: _pages)),
+                    ]),
+                  ),
                 ]),
-                const SizedBox(height: 10),
-                // Admin profile card in sidebar
-                _buildSidebarProfile(),
-              ]),
-            ),
-            // Menu items (no scroll)
-            Column(children: [
-              _buildSidebarItem(Icons.home_outlined,       'Home',        index: 0),
-              _buildSidebarItem(Icons.dashboard_outlined,  'Dashboard',   index: 1),
-              _buildSidebarItem(Icons.sensors_outlined,    'Devices',     index: 2),
-              _buildSidebarItem(Icons.local_shipping_outlined, 'Vehicles', index: 3),
-              _buildSidebarItem(Icons.timeline,            'Trajectory',  index: 4),
-              _buildSidebarItem(Icons.build_outlined,      'Maintenance', index: 5),
-              _buildSidebarItem(Icons.local_shipping,     'Livraisons',  index: 6),
-              _buildSidebarItem(Icons.swap_horiz_outlined,'Hist. E/S',   index: 7),
-              _buildSidebarItem(Icons.security_outlined,   'Ctrl Accès', index: 8),
-              _buildSidebarItem(Icons.people_outlined,     'Users',       index: 9),
-              Divider(height: 1, color: Colors.grey.shade100),
-              const SizedBox(height: 2),
-              _buildSidebarItem(Icons.help_outline, 'Support', customOnTap: () => showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Fleet Command Support'),
-                  content: const Text('For technical assistance, contact:\n\nsupport@fleetcommand.io\n+1 (800) 555-FLEET\n\nAvailable 24/7'),
-                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
-                ),
-              )),
-              _buildSidebarItem(Icons.logout, 'Logout', customOnTap: () => _showProfilePanel()),
-            ]),
-          ]),
-        ),
-        // ── Main Content ──
-        Expanded(
-          child: Column(children: [
-            _buildTopBar(),
-            Expanded(child: IndexedStack(index: _selectedIndex, children: _pages)),
-          ]),
-        ),
-      ]),
+        );
+        return scaffold;
+      },
     );
+  }
+
+  /// Shared sidebar content used inline (desktop) and inside Drawer (mobile).
+  Widget _buildSidebarContent() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Brand
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.local_shipping, size: 14, color: Colors.white),
+            ),
+            const SizedBox(width: 8),
+            Text('Fleet Command', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF0F172A))),
+          ]),
+          const SizedBox(height: 10),
+          _buildSidebarProfile(),
+        ]),
+      ),
+      _buildSidebarItem(Icons.home_outlined,            _appLoc.home,           index: 0),
+      _buildSidebarItem(Icons.dashboard_outlined,       _appLoc.dashboard,      index: 1),
+      _buildSidebarItem(Icons.sensors_outlined,         _appLoc.devices,        index: 2),
+      _buildSidebarItem(Icons.local_shipping_outlined,  _appLoc.vehicles,       index: 3),
+      _buildSidebarItem(Icons.timeline,                 _appLoc.trajectory,     index: 4),
+      _buildSidebarItem(Icons.build_outlined,           _appLoc.maintenance,    index: 5),
+      _buildSidebarItem(Icons.local_shipping,           _appLoc.deliveries,     index: 6),
+      _buildSidebarItem(Icons.swap_horiz_outlined,      _appLoc.history,        index: 7),
+      _buildSidebarItem(Icons.security_outlined,        _appLoc.accessControl,  index: 8),
+      _buildSidebarItem(Icons.people_outlined,          _appLoc.users,          index: 9),
+      const Divider(height: 1),
+      const SizedBox(height: 2),
+      _buildSidebarItem(Icons.help_outline, _appLoc.support, customOnTap: () => showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(_appLoc.tr('Fleet Command Support', fr: 'Support Fleet Command', ar: '??? ????? ???????')),
+          content: Text(_appLoc.tr(
+            'For technical assistance, contact:\n\nsupport@fleetcommand.io\n+1 (800) 555-FLEET\n\nAvailable 24/7',
+            fr: 'Pour une assistance technique :\n\nsupport@fleetcommand.io\n+1 (800) 555-FLEET\n\nDisponible 24/7',
+            ar: '????????? ?????:\n\nsupport@fleetcommand.io\n+1 (800) 555-FLEET\n\n???? 24/7',
+          )),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(_appLoc.close))],
+        ),
+      )),
+      _buildSidebarItem(Icons.logout, _appLoc.logout, customOnTap: () => _showProfilePanel()),
+    ]);
   }
 
   // ─── Sidebar profile card ─────────────────────────────────────────────────
@@ -336,11 +466,11 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(_admin.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 11, color: const Color(0xFF0F172A))),
-            Row(children: [
-              Container(width: 5, height: 5, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
-              const SizedBox(width: 3),
-              Text('ACTIVE OPS', style: GoogleFonts.inter(fontSize: 8, color: Colors.green, fontWeight: FontWeight.bold, letterSpacing: 0.3)),
-            ]),
+              Row(children: [
+                Container(width: 5, height: 5, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                const SizedBox(width: 3),
+                Text(_appLoc.activeOps, style: GoogleFonts.inter(fontSize: 8, color: Colors.green, fontWeight: FontWeight.bold, letterSpacing: 0.3)),
+              ]),
           ])),
           const Icon(Icons.chevron_right, size: 14, color: Color(0xFF94A3B8)),
         ]),
@@ -391,13 +521,13 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
           child: Row(children: [
             const Icon(Icons.search, size: 17, color: Color(0xFF94A3B8)),
             const SizedBox(width: 10),
-            Expanded(child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search fleet resources…',
-                hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8), fontSize: 13),
-                border: InputBorder.none, isDense: true,
-              ),
-            )),
+              Expanded(child: TextField(
+                decoration: InputDecoration(
+                  hintText: _appLoc.search,
+                  hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8), fontSize: 13),
+                  border: InputBorder.none, isDense: true,
+                ),
+              )),
           ]),
         )),
         const SizedBox(width: 20),
@@ -574,7 +704,7 @@ class _NotifPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final unread = notifications.where((n) => !n.read).length;
     return SizedBox(
-      width: 360,
+      width: math.min(MediaQuery.of(context).size.width - 32, 360),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         // Header
         Container(
@@ -663,9 +793,16 @@ class _NotifPanel extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SettingsPanel extends StatefulWidget {
+  final Locale currentLocale;
+  final void Function(Locale) onLanguageChanged;
   final VoidCallback onClose;
   final VoidCallback onSaved;
-  const _SettingsPanel({required this.onClose, required this.onSaved});
+  const _SettingsPanel({
+    required this.currentLocale,
+    required this.onLanguageChanged,
+    required this.onClose,
+    required this.onSaved,
+  });
   @override
   State<_SettingsPanel> createState() => _SettingsPanelState();
 }
@@ -676,14 +813,36 @@ class _SettingsPanelState extends State<_SettingsPanel> {
   bool _autoRefresh   = true;
   int  _refreshSecs   = 5;
   String _mapStyle    = 'Streets';
-  String _language    = 'English';
+  late String _langValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _langValue = _localeLabel(widget.currentLocale);
+  }
+
+  String _localeLabel(Locale l) {
+    switch (l.languageCode) {
+      case 'fr': return 'Français';
+      case 'ar': return 'العربية';
+      default:   return 'English';
+    }
+  }
+
+  Locale _parseLocale(String label) {
+    switch (label) {
+      case 'Français':  return const Locale('fr');
+      case 'العربية':   return const Locale('ar');
+      default:          return const Locale('en');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLoc(widget.currentLocale);
     return SizedBox(
-      width: 300,
+      width: math.min(MediaQuery.of(context).size.width - 32, 300),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        // Header
         Container(
           padding: const EdgeInsets.fromLTRB(18, 16, 12, 14),
           decoration: const BoxDecoration(
@@ -693,59 +852,59 @@ class _SettingsPanelState extends State<_SettingsPanel> {
           child: Row(children: [
             const Icon(Icons.tune, color: Colors.white, size: 18),
             const SizedBox(width: 10),
-            Text('Settings', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(loc.settings, style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
             const Spacer(),
             IconButton(icon: const Icon(Icons.close, color: Colors.white54, size: 18), onPressed: widget.onClose, constraints: const BoxConstraints()),
           ]),
         ),
-        // Body
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _sectionLabel('DISPLAY'),
-            _toggleRow('Push Notifications', Icons.notifications_outlined, _notifEnabled,
-                (v) => setState(() => _notifEnabled = v)),
-            _toggleRow('Compact Sidebar',    Icons.view_sidebar_outlined,  _compactView,
-                (v) => setState(() => _compactView = v)),
+            _sectionLabel(loc.display),
+            _toggleRow(loc.pushNotif, Icons.notifications_outlined, _notifEnabled, (v) => setState(() => _notifEnabled = v)),
+            _toggleRow(loc.compactSidebar, Icons.view_sidebar_outlined, _compactView, (v) => setState(() => _compactView = v)),
             const SizedBox(height: 12),
-            _sectionLabel('DATA'),
-            _toggleRow('Auto Refresh',       Icons.sync,  _autoRefresh,
-                (v) => setState(() => _autoRefresh = v)),
+            _sectionLabel(loc.data),
+            _toggleRow(loc.autoRefresh, Icons.sync, _autoRefresh, (v) => setState(() => _autoRefresh = v)),
             if (_autoRefresh) ...[
               const SizedBox(height: 8),
               Row(children: [
                 const Icon(Icons.timer_outlined, size: 16, color: Color(0xFF94A3B8)),
                 const SizedBox(width: 10),
-                Text('Refresh every', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
+                Text(loc.refreshEvery, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
                 const Spacer(),
                 _segmented([5, 10, 30], _refreshSecs, (v) => setState(() => _refreshSecs = v), suffix: 's'),
               ]),
             ],
             const SizedBox(height: 12),
-            _sectionLabel('MAP'),
+            _sectionLabel(loc.map),
             Row(children: [
               const Icon(Icons.map_outlined, size: 16, color: Color(0xFF94A3B8)),
               const SizedBox(width: 10),
-              Text('Map style', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
+              Text(loc.mapStyle, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
               const Spacer(),
               _segmented(['Streets', 'Satellite'], _mapStyle, (v) => setState(() => _mapStyle = v)),
             ]),
             const SizedBox(height: 12),
-            _sectionLabel('REGIONAL'),
+            _sectionLabel(loc.regional),
             Row(children: [
               const Icon(Icons.language, size: 16, color: Color(0xFF94A3B8)),
               const SizedBox(width: 10),
-              Text('Language', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
+              Text(loc.language, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569))),
               const Spacer(),
               DropdownButton<String>(
-                value: _language,
+                value: _langValue,
                 isDense: true,
                 underline: const SizedBox(),
                 style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0F172A)),
-                items: ['English', 'Français', 'Español', 'العربية']
+                items: [loc.langEn, loc.langFr, loc.langAr]
                     .map((l) => DropdownMenuItem(value: l, child: Text(l)))
                     .toList(),
-                onChanged: (v) => setState(() => _language = v!),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() => _langValue = v);
+                  widget.onLanguageChanged(_parseLocale(v));
+                },
               ),
             ]),
             const SizedBox(height: 20),
@@ -758,7 +917,7 @@ class _SettingsPanelState extends State<_SettingsPanel> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: widget.onSaved,
-                child: Text('Save Changes', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
+                child: Text(loc.saveChanges, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
               ),
             ),
           ]),
@@ -823,11 +982,13 @@ class _SettingsPanelState extends State<_SettingsPanel> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProfilePanel extends StatefulWidget {
+  final AppLoc appLoc;
   final _AdminData admin;
   final VoidCallback onClose;
   final void Function(_AdminData) onProfileUpdated;
   final VoidCallback onLogout;
   const _ProfilePanel({
+    required this.appLoc,
     required this.admin,
     required this.onClose,
     required this.onProfileUpdated,
@@ -884,8 +1045,9 @@ class _ProfilePanelState extends State<_ProfilePanel> {
   @override
   Widget build(BuildContext context) {
     final a = widget.admin;
+    final loc = widget.appLoc;
     return SizedBox(
-      width: 300,
+      width: math.min(MediaQuery.of(context).size.width - 32, 300),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         // ── Profile header ──
         Container(
@@ -904,7 +1066,6 @@ class _ProfilePanelState extends State<_ProfilePanel> {
                 onPressed: widget.onClose, constraints: const BoxConstraints(), padding: EdgeInsets.zero,
               ),
             ]),
-            // Avatar with initials
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
@@ -933,28 +1094,27 @@ class _ProfilePanelState extends State<_ProfilePanel> {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
                 const SizedBox(width: 6),
-                Text('ACTIVE OPS', style: GoogleFonts.inter(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
+                Text(loc.activeOps, style: GoogleFonts.inter(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8)),
               ]),
             ),
           ]),
         ),
-        // ── Info rows ──
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(children: [
             _infoRow(Icons.email_outlined,      a.email),
             _infoRow(Icons.phone_outlined,       a.phone),
-            _infoRow(Icons.badge_outlined,       'Full Admin Access'),
-            _infoRow(Icons.business_outlined,    '${a.department} Department'),
-            _infoRow(Icons.access_time_outlined, 'Last login: Today, 09:42 AM'),
+            _infoRow(Icons.badge_outlined,       loc.tr('Full Admin Access', fr: 'Accès Admin complet', ar: 'وصول المسؤول الكامل')),
+            _infoRow(Icons.business_outlined,    loc.tr('${a.department} Department', fr: 'Département ${a.department}', ar: 'قسم ${a.department}')),
+            _infoRow(Icons.access_time_outlined, loc.tr('Last login: Today, 09:42 AM', fr: 'Dernière connexion : Aujourd\'hui, 09:42', ar: 'آخر تسجيل دخول: اليوم, 09:42')),
             const SizedBox(height: 12),
             Divider(height: 1, color: Colors.grey.shade100),
             const SizedBox(height: 12),
-            _actionButton(Icons.manage_accounts_outlined, 'Edit Profile',    const Color(0xFF0F172A), Colors.white,               _openEditProfile),
+            _actionButton(Icons.manage_accounts_outlined, loc.editProfile,    const Color(0xFF0F172A), Colors.white,               _openEditProfile),
             const SizedBox(height: 8),
-            _actionButton(Icons.lock_outline,             'Change Password', const Color(0xFFF8FAFC), const Color(0xFF0F172A),    _openChangePassword, border: true),
+            _actionButton(Icons.lock_outline,             loc.changePassword, const Color(0xFFF8FAFC), const Color(0xFF0F172A),    _openChangePassword, border: true),
             const SizedBox(height: 8),
-            _actionButton(Icons.logout,                   'Sign Out',        Colors.red.shade50,       Colors.red, widget.onLogout, border: true, borderColor: Colors.red.shade200),
+            _actionButton(Icons.logout,                   loc.signOut,        Colors.red.shade50,       Colors.red, widget.onLogout, border: true, borderColor: Colors.red.shade200),
           ]),
         ),
       ]),

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -106,7 +107,7 @@ class _UsersPageState extends State<UsersPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           title: const Text('Nouvel utilisateur'),
           content: SizedBox(
-            width: 400,
+            width: math.min(MediaQuery.of(ctx).size.width - 32, 400),
             child: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Nom', filled: true, fillColor: Color(0xFFF8FAFC), border: OutlineInputBorder())),
@@ -235,43 +236,48 @@ class _UsersPageState extends State<UsersPage> {
         ),
         const SizedBox(width: 14),
         Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-          Text(u['email'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+          Text(u['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+          Text(u['email'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 11), overflow: TextOverflow.ellipsis),
         ])),
-        Expanded(flex: 1, child: Text(u['phone'] ?? '—', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12))),
-        Expanded(flex: 1, child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
             color: role == 'admin' ? const Color(0xFFEFF6FF) : role == 'operator' ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(role.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: role == 'admin' ? const Color(0xFF3B82F6) : role == 'operator' ? const Color(0xFF16A34A) : const Color(0xFF64748B))),
-        )),
-        Expanded(flex: 1, child: Row(children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: isActive ? Colors.green : Colors.red, shape: BoxShape.circle)),
-          const SizedBox(width: 6),
-          Text(isActive ? 'Actif' : 'Inactif', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-        ])),
+          child: Text(
+            role == 'admin' ? 'ADM' : role == 'operator' ? 'OP' : 'VIEW',
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: role == 'admin' ? const Color(0xFF3B82F6) : role == 'operator' ? const Color(0xFF16A34A) : const Color(0xFF64748B)),
+          ),
+        ),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: isActive ? Colors.green : Colors.red, shape: BoxShape.circle)),
         if ((u['id'] as int?) != 1)
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Confirmer'),
-                  content: Text('Supprimer ${u['name']} ?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                      onPressed: () { Navigator.pop(context); _deleteUser(u['id']); },
-                      child: const Text('Supprimer'),
-                    ),
-                  ],
-                ),
-              );
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8), size: 18),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            onSelected: (action) {
+              if (action == 'delete') {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Confirmer'),
+                    content: Text('Supprimer ${u['name']} ?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                        onPressed: () { Navigator.pop(context); _deleteUser(u['id']); },
+                        child: const Text('Supprimer'),
+                      ),
+                    ],
+                  ),
+                );
+              }
             },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Supprimer', style: TextStyle(color: Colors.red))])),
+            ],
           ),
       ]),
     );

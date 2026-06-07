@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../constants.dart';
 import '../mock_data.dart';
 import '../nav_service.dart';
+import 'dart:math' as math;
 
 // ---------------------------------------------------------------------------
 // Models
@@ -108,10 +109,10 @@ class _MaintenancePageState extends State<MaintenancePage> {
   static const _truckImages = [
     'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=600',
     'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600',
-    'https://images.unsplash.com/photo-1601584115197-04ecc0da31d3?auto=format&fit=crop&q=80&w=600',
     'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&q=80&w=600',
     'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?auto=format&fit=crop&q=80&w=600',
     'https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&q=80&w=600',
+    'https://images.unsplash.com/photo-1503435980765-2765a1ff8a2a?auto=format&fit=crop&q=80&w=600',
   ];
   static final _vehicleImages = <int, String>{
     1: _truckImages[0], 2: _truckImages[1], 3: _truckImages[2],
@@ -415,7 +416,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
           content: Form(
             key: formKey,
             child: SizedBox(
-              width: 500,
+              width: math.min(MediaQuery.of(context).size.width - 32, 500),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 DropdownButtonFormField<String>(
                   initialValue: logType,
@@ -483,7 +484,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
           Text('Full System Scan — Results', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
         ]),
         content: SizedBox(
-          width: 520,
+          width: math.min(MediaQuery.of(context).size.width - 32, 520),
           child: codes.isEmpty
               ? Column(mainAxisSize: MainAxisSize.min, children: [
                   const Icon(Icons.check_circle, color: Colors.green, size: 48),
@@ -527,7 +528,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
         builder: (ctx, setDs) => AlertDialog(
           title: Text('Schedule Preemptive Fix', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
           content: SizedBox(
-            width: 460,
+            width: math.min(MediaQuery.of(context).size.width - 32, 460),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Container(
                 padding: const EdgeInsets.all(12),
@@ -610,7 +611,7 @@ class _MaintenancePageState extends State<MaintenancePage> {
       builder: (_) => AlertDialog(
         title: Text('Commander pièces', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
         content: SizedBox(
-          width: 480,
+          width: math.min(MediaQuery.of(context).size.width - 32, 480),
           child: urgent.isEmpty
               ? Text('Toutes les pièces sont en stock.', style: GoogleFonts.inter())
               : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -671,21 +672,27 @@ class _MaintenancePageState extends State<MaintenancePage> {
       backgroundColor: const Color(0xFFF1F5F9),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_backendOffline) _buildOfflineBanner(),
-                  _buildHeader(),
-                  const SizedBox(height: 24),
-                  _buildTabBar(),
-                  const SizedBox(height: 24),
-                  _buildTabContent(),
-                  const SizedBox(height: 24),
-                  _buildPredictiveBanner(),
-                ],
-              ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 768;
+                final hp = isMobile ? 12.0 : 24.0;
+                return SingleChildScrollView(
+                  padding: EdgeInsets.all(hp),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_backendOffline) _buildOfflineBanner(),
+                      _buildHeader(isMobile: isMobile),
+                      const SizedBox(height: 24),
+                      _buildTabBar(),
+                      const SizedBox(height: 24),
+                      _buildTabContent(),
+                      const SizedBox(height: 24),
+                      _buildPredictiveBanner(),
+                    ],
+                  ),
+                );
+              },
             ),
     );
   }
@@ -711,136 +718,104 @@ class _MaintenancePageState extends State<MaintenancePage> {
   }
 
   // ─── Header ──────────────────────────────────────────────────────────────
-  Widget _buildHeader() {
+  Widget _buildHeader({bool isMobile = false}) {
     final v = _currentVehicle;
     final diag = _diagnostics;
+    final imgSize = isMobile ? (MediaQuery.of(context).size.width * 0.9).clamp(200.0, 400.0) : 200.0;
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)],
       ),
-      child: Row(children: [
-        // ── Vehicle image — dynamic per selected vehicle ───────────────
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: Image.network(
-                  _vehicleImages[_selectedVehicleId] ??
-                      'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&q=80&w=600',
-                  key: ValueKey(_selectedVehicleId),
-                  width: 200, height: 130, fit: BoxFit.cover,
-                  loadingBuilder: (_, child, progress) => progress == null
-                      ? child
-                      : Container(
-                          width: 200, height: 130,
-                          color: const Color(0xFFF1F5F9),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 24, height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3B82F6)),
-                            ),
-                          ),
-                        ),
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 200, height: 130,
-                    color: const Color(0xFFF1F5F9),
-                    child: const Icon(Icons.local_shipping, size: 48, color: Colors.grey),
-                  ),
-                ),
-              ),
-              // Bottom gradient overlay with plate number
-              Positioned(
-                bottom: 0, left: 0, right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent],
-                    ),
-                  ),
-                  child: Text(
-                    v['plate'] as String? ?? '',
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          DropdownButton<int>(
-            value: _selectedVehicleId,
-            underline: const SizedBox(),
-            style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-            items: _vehicles.map((vehicle) {
-              final vid = vehicle['id'] as int;
-              return DropdownMenuItem<int>(
-                value: vid,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        _vehicleImages[vid] ?? '',
-                        width: 36, height: 36, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 36, height: 36,
-                          color: const Color(0xFFF1F5F9),
-                          child: const Icon(Icons.local_shipping, size: 20, color: Colors.grey),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${vehicle['model']} — ${vehicle['plate']}',
-                      style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-            onChanged: (id) { if (id != null) _onVehicleChanged(id); },
-          ),
-          const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.local_shipping_outlined, size: 14, color: Colors.grey),
-            const SizedBox(width: 4),
-            Text(v['status'] as String? ?? 'ACTIVE', style: GoogleFonts.inter(color: Colors.grey, fontSize: 13)),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            _buildStatusBadge(v['status'] as String? ?? 'ACTIVE', _statusColor(v['status'] as String? ?? 'ACTIVE')),
-            const SizedBox(width: 12),
-            Text('${_logs.length} Maintenance Record(s)', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: const Color(0xFF64748B))),
-          ]),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _buildHeaderStatCard('BATTERY HEALTH', '${diag['battery_health'] ?? 94}%', null),
-              const SizedBox(width: 12),
-              _buildHeaderStatCard('NEXT SERVICE', '${diag['next_service_days'] ?? 12} Days', diag['next_service_type']?.toString(), isWarning: true),
-              const SizedBox(width: 12),
-              IconButton(icon: const Icon(Icons.refresh, color: Color(0xFF64748B)), tooltip: 'Refresh', onPressed: _loadAll),
-            ]),
-          ),
-        ])),
-      ]),
+      child: isMobile
+          ? Column(children: [_buildHeaderImage(v, imgSize), const SizedBox(height: 16), _buildHeaderContent(v, diag, isMobile)])
+          : Row(children: [_buildHeaderImage(v, imgSize), const SizedBox(width: 24), Expanded(child: _buildHeaderContent(v, diag, false))]),
     );
+  }
+
+  Widget _buildHeaderImage(Map<String, dynamic> v, double size) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: size,
+        height: size * 0.65,
+        child: Stack(children: [
+          Image.network(
+            _vehicleImages[_selectedVehicleId] ??
+                'https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&q=80&w=600',
+            key: ValueKey(_selectedVehicleId),
+            width: size, height: size * 0.65, fit: BoxFit.cover,
+            loadingBuilder: (_, child, progress) => progress == null
+                ? child
+                : Container(width: size, height: size * 0.65, color: const Color(0xFFF1F5F9), child: const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3B82F6))))),
+            errorBuilder: (_, __, ___) => Container(width: size, height: size * 0.65, color: const Color(0xFFF1F5F9), child: const Icon(Icons.local_shipping, size: 48, color: Colors.grey)),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent]),
+              ),
+              child: Text(v['plate'] as String? ?? '', style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildHeaderContent(Map<String, dynamic> v, Map<String, dynamic> diag, bool isMobile) {
+    final ts = isMobile ? 18.0 : 22.0;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      DropdownButton<int>(
+        value: _selectedVehicleId,
+        underline: const SizedBox(),
+        style: GoogleFonts.inter(fontSize: ts, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+        items: _vehicles.map((vehicle) {
+          final vid = vehicle['id'] as int;
+          return DropdownMenuItem<int>(
+            value: vid,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.network(_vehicleImages[vid] ?? '', width: 36, height: 36, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(width: 36, height: 36, color: const Color(0xFFF1F5F9), child: const Icon(Icons.local_shipping, size: 20, color: Colors.grey)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text('${vehicle['model']} — ${vehicle['plate']}', style: GoogleFonts.inter(fontSize: ts, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            ]),
+          );
+        }).toList(),
+        onChanged: (id) { if (id != null) _onVehicleChanged(id); },
+      ),
+      const SizedBox(height: 4),
+      Row(children: [
+        const Icon(Icons.local_shipping_outlined, size: 14, color: Colors.grey),
+        const SizedBox(width: 4),
+        Text(v['status'] as String? ?? 'ACTIVE', style: GoogleFonts.inter(color: Colors.grey, fontSize: 13)),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [
+        _buildStatusBadge(v['status'] as String? ?? 'ACTIVE', _statusColor(v['status'] as String? ?? 'ACTIVE')),
+        const SizedBox(width: 12),
+        Text('${_logs.length} Maintenance Record(s)', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13, color: const Color(0xFF64748B))),
+      ]),
+      const SizedBox(height: 12),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          _buildHeaderStatCard('BATTERY HEALTH', '${diag['battery_health'] ?? 94}%', null),
+          const SizedBox(width: 12),
+          _buildHeaderStatCard('NEXT SERVICE', '${diag['next_service_days'] ?? 12} Days', diag['next_service_type']?.toString(), isWarning: true),
+          const SizedBox(width: 12),
+          IconButton(icon: const Icon(Icons.refresh, color: Color(0xFF64748B)), tooltip: 'Refresh', onPressed: _loadAll),
+        ]),
+      ),
+    ]);
   }
 
   Widget _buildHeaderStatCard(String label, String value, String? subtext, {bool isWarning = false}) {

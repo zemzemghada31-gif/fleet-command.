@@ -27,6 +27,8 @@ class LiveVehicle {
   final double lat;
   final double lng;
 
+  String get plate => location.split(' - ').last;
+
   const LiveVehicle({
     required this.id,
     required this.location,
@@ -104,25 +106,9 @@ class _DashboardPageState extends State<DashboardPage>
   final MapController _mapController = MapController();
   final _rnd = Random();
 
-  // ─── Mock data sourced from mock_data.dart central repository ─────────────
-  static String _locationForVehicle(double lat, double lng) {
-    if (lat > 41.5 && lat < 42.5 && lng > -88 && lng < -87) return 'Interstate 90, Chicago IL';
-    if (lat > 37 && lat < 38 && lng > -122.5 && lng < -121.5) return 'US-101, San Francisco CA';
-    if (lat > 37.5 && lat < 38 && lng > -122.5 && lng < -121.5) return 'South Bay Distribution Ctr';
-    if (lat > 25 && lat < 26 && lng > -81 && lng < -80) return 'Miami Logistics Terminal';
-    if (lat > 51 && lat < 52 && lng > -0.5 && lng < 0.5) return 'London Distribution Hub';
-    if (lat > 48 && lat < 49 && lng > 2 && lng < 3) return 'Paris Nord Depot';
-    if (lat > 45.5 && lat < 46 && lng > 4.5 && lng < 5) return 'A6 Highway, Lyon';
-    if (lat > 43 && lat < 44 && lng > 1 && lng < 2) return 'Toulouse Cargo Center';
-    if (lat > 52 && lat < 53 && lng > 13 && lng < 14) return 'Berlin Logistics Hub';
-    if (lat > 41.5 && lat < 42.5 && lng > 12 && lng < 13) return 'Rome Freight Terminal';
-    if (lat > 35 && lat < 36 && lng > 139 && lng < 140) return 'Tokyo Bay Depot';
-    if (lat > 51 && lat < 52 && lng > 0 && lng < 0.5) return 'London East End Depot';
-    if (lat > 37.5 && lat < 38 && lng > 126.5 && lng < 127.5) return 'Seoul Logistics Center';
-    if (lat > -34 && lat < -33 && lng > 151 && lng < 152) return 'Sydney Freight Terminal';
-    if (lat > 39.5 && lat < 40 && lng > -105 && lng < -104) return 'I-25, Denver CO';
-    if (lat > 46 && lat < 47 && lng > 4.5 && lng < 5) return 'A6, Lyon Paris';
-    return '${lat.toStringAsFixed(1)}°N, ${lng.toStringAsFixed(1)}°E';
+
+  static String _backendId(int id, String plate, String model) {
+    return '${plate.substring(0, 2).toUpperCase()}-${id.toString().padLeft(4, '0')}-${model[0].toUpperCase()}';
   }
 
   static List<LiveVehicle> _buildMockFromCentral() {
@@ -132,8 +118,8 @@ class _DashboardPageState extends State<DashboardPage>
           ? List.generate(10, (i) => (mv.speed + rng.nextDouble() * 10 - 5).clamp(0, 120))
           : List.filled(10, 0.0);
       return LiveVehicle(
-        id: mv.plate,
-        location: _locationForVehicle(mv.lat, mv.lng),
+        id: _backendId(mv.id, mv.plate, mv.model),
+        location: '${mv.model} - ${mv.plate}',
         status: mv.status == 'ACTIVE' ? 'MOVING' : mv.status,
         speed: mv.speed,
         fuel: mv.fuel,
@@ -337,6 +323,147 @@ class _DashboardPageState extends State<DashboardPage>
   // ─── Build ───────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    if (isMobile) return _buildMobileLayout();
+    return _buildDesktopLayout();
+  }
+
+  Widget _buildMobileLayout() {
+    final filtered = _filteredVehicles;
+    return Column(children: [
+      // Search bar
+      Container(
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8)],
+        ),
+        child: Row(children: [
+          const Icon(Icons.search, color: Colors.grey, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: TextField(
+            onChanged: (v) => setState(() => _searchQuery = v),
+            decoration: const InputDecoration(
+              hintText: 'Search vehicle ID, driver…',
+              border: InputBorder.none,
+              hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
+              isDense: true,
+            ),
+          )),
+        ]),
+      ),
+      // Stats row
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        child: Row(children: [
+          _mobileStat('Total', '${_vehicles.length}', Colors.blue),
+          const SizedBox(width: 8),
+          _mobileStat('Moving', '$_movingCount', Colors.green),
+          const SizedBox(width: 8),
+          _mobileStat('Idle', '${_vehicles.where((v) => v.status == 'IDLE').length}', Colors.grey),
+          const SizedBox(width: 8),
+          _mobileStat('Alert', '${_vehicles.where((v) => v.status == 'MAINTENANCE').length}', Colors.red),
+        ]),
+      ),
+      // Filter chips
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final f in ['All', 'Moving', 'Idle', 'Alert'])
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: _mobileFilterChip(f),
+              ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 4),
+      // Vehicle list
+      Expanded(
+        child: filtered.isEmpty
+            ? Center(child: Text('No vehicles match', style: GoogleFonts.inter(color: Colors.grey, fontSize: 13)))
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                itemCount: filtered.length,
+                itemBuilder: (_, i) => _buildMobileFleetItem(filtered[i]),
+              ),
+      ),
+    ]);
+  }
+
+  Widget _mobileStat(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+        ),
+        child: Column(children: [
+          Text(value, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: GoogleFonts.inter(fontSize: 10, color: Colors.grey)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _mobileFilterChip(String label) {
+    final selected = _filter == label;
+    return GestureDetector(
+      onTap: () => setState(() => _filter = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF0F172A) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? Colors.transparent : const Color(0xFFE2E8F0)),
+        ),
+        child: Text(label, style: GoogleFonts.inter(
+          fontSize: 11, fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : const Color(0xFF64748B),
+        )),
+      ),
+    );
+  }
+
+  Widget _buildMobileFleetItem(LiveVehicle v) {
+    final color = _statusColor(v.status);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6)],
+      ),
+      child: ListTile(
+        onTap: () {},
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        leading: Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+          child: Icon(Icons.local_shipping, color: color, size: 20),
+        ),
+        title: Text(v.id, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+        subtitle: Text(v.driver, style: GoogleFonts.inter(fontSize: 11, color: Colors.grey)),
+        trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text('${v.speed.toStringAsFixed(0)} mph', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+            Text(v.status, style: GoogleFonts.inter(fontSize: 9, color: color, fontWeight: FontWeight.w600)),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout() {
     return Stack(children: [
       // ── Background: real OSM map ──
       _buildBackgroundMap(),
@@ -347,7 +474,7 @@ class _DashboardPageState extends State<DashboardPage>
           top: 24, left: 24,
           child: Row(children: [
             Container(
-              width: 350, height: 48,
+              width: min(MediaQuery.of(context).size.width - 48, 350), height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -614,7 +741,7 @@ class _DashboardPageState extends State<DashboardPage>
     return Positioned(
       top: 140, left: 180,
       child: Container(
-        width: 290,
+        width: min(MediaQuery.of(context).size.width - 32, 290),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -624,8 +751,8 @@ class _DashboardPageState extends State<DashboardPage>
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('VEHICLE ID', style: GoogleFonts.inter(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
-              Text(v.id, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text('PLATE', style: GoogleFonts.inter(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+              Text(v.plate, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
             ]),
             Row(children: [
               AnimatedBuilder(
@@ -723,7 +850,7 @@ class _DashboardPageState extends State<DashboardPage>
     final filtered = _filteredVehicles;
     return Container(
       key: key,
-      width: 380,
+      width: min(MediaQuery.of(context).size.width - 48, 380),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(16),
@@ -791,7 +918,7 @@ class _DashboardPageState extends State<DashboardPage>
 
     return Container(
       key: key,
-      width: 380,
+      width: min(MediaQuery.of(context).size.width - 48, 380),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -831,7 +958,7 @@ class _DashboardPageState extends State<DashboardPage>
             const SizedBox(height: 16),
             Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(v.id, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                Text(v.plate, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 4),
                 Row(children: [
                   const Icon(Icons.person, color: Colors.white54, size: 14),
@@ -1106,7 +1233,7 @@ class _DashboardPageState extends State<DashboardPage>
             ),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(v.id, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(v.plate, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
               Text(v.location, style: GoogleFonts.inter(color: Colors.grey, fontSize: 11), overflow: TextOverflow.ellipsis),
             ])),
             Row(children: [
@@ -1229,7 +1356,7 @@ class _RouteDialogContentState extends State<_RouteDialogContent> {
     final distLabel = distKm < 1 ? '${(distKm * 1000).toStringAsFixed(0)} m' : '${distKm.toStringAsFixed(2)} km';
 
     return SizedBox(
-      width: 620, height: 540,
+      width: min(620, MediaQuery.of(context).size.width - 48), height: 540,
       child: Column(children: [
         // ── Header ──
         Container(
@@ -1242,7 +1369,7 @@ class _RouteDialogContentState extends State<_RouteDialogContent> {
             const Icon(Icons.route, color: Colors.white, size: 20),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Route View — ${v.id}', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              Text('Route View — ${v.plate}', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
               Text('${v.driver}  ·  ${v.location}', style: GoogleFonts.inter(color: Colors.white54, fontSize: 11), overflow: TextOverflow.ellipsis),
             ])),
             // Stats chips
@@ -1450,7 +1577,7 @@ class _ReportDialogContentState extends State<_ReportDialogContent> {
   Widget build(BuildContext context) {
     final v = widget.vehicle;
     return SizedBox(
-      width: 480,
+      width: min(480, MediaQuery.of(context).size.width - 48),
       child: Form(
         key: _formKey,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1466,7 +1593,7 @@ class _ReportDialogContentState extends State<_ReportDialogContent> {
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Incident Report', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                Text('${v.id}  ·  ${v.driver}  ·  INC-${widget.reportNumber.toString().padLeft(4, '0')}',
+                Text('${v.plate}  ·  ${v.driver}  ·  INC-${widget.reportNumber.toString().padLeft(4, '0')}',
                     style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
               ])),
               IconButton(

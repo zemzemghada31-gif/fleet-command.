@@ -5,6 +5,7 @@ import 'dart:convert';
 import '../constants.dart';
 import '../mock_data.dart';
 import '../services/sync_service.dart';
+import 'dart:math' as math;
 
 // ---------------------------------------------------------------------------
 // Model
@@ -59,6 +60,8 @@ class VehiclePage extends StatefulWidget {
 
 class _VehiclePageState extends State<VehiclePage> {
   List<Vehicle> _vehicles = [];
+  List<Vehicle> _trashVehicles = [];
+  bool _showTrash = false;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _backendOffline = false;
@@ -213,6 +216,14 @@ class _VehiclePageState extends State<VehiclePage> {
     } catch (_) {}
   }
 
+  Future<void> _saveTrashLocally(List<Vehicle> vehicles) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = vehicles.map((v) => v.toJson()).toList();
+      await prefs.setString('cached_vehicles_trash', json.encode(jsonList));
+    } catch (_) {}
+  }
+
   Future<void> _loadVehiclesFromLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -221,9 +232,16 @@ class _VehiclePageState extends State<VehiclePage> {
         final list = (json.decode(data) as List).map((e) => Vehicle.fromJson(e)).toList();
         if (mounted) {
           setState(() { _vehicles = list; _isLoading = false; _backendOffline = true; });
-          return;
         }
       }
+      final trashData = prefs.getString('cached_vehicles_trash');
+      if (trashData != null) {
+        final trashList = (json.decode(trashData) as List).map((e) => Vehicle.fromJson(e)).toList();
+        if (mounted) {
+          setState(() => _trashVehicles = trashList);
+        }
+      }
+      return;
     } catch (_) {}
     if (mounted) _fallbackToMock();
   }
@@ -315,7 +333,7 @@ class _VehiclePageState extends State<VehiclePage> {
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Delete Vehicle'),
-        content: Text('Delete ${v.model} (${v.plate})?'),
+        content: Text('Move ${v.model} (${v.plate}) to trash?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
@@ -329,11 +347,14 @@ class _VehiclePageState extends State<VehiclePage> {
     if (ok != true || !mounted) return;
 
     if (_backendOffline) {
-      // Queue for sync when backend comes back online
       await SyncService.addOperation(SyncOperationType.deleteVehicle, {'id': v.id});
-      setState(() => _vehicles.removeWhere((x) => x.id == v.id));
+      setState(() {
+        _vehicles.removeWhere((x) => x.id == v.id);
+        _trashVehicles.add(v);
+      });
       await _saveVehiclesLocally(_vehicles);
-      _snack('Vehicle deleted locally (will sync when online).');
+      await _saveTrashLocally(_trashVehicles);
+      _snack('Vehicle moved to trash locally (will sync when online).');
       return;
     }
     try {
@@ -342,20 +363,62 @@ class _VehiclePageState extends State<VehiclePage> {
           .timeout(const Duration(seconds: 6));
       if (!mounted) return;
       if (res.statusCode == 200) {
-        setState(() => _vehicles.removeWhere((x) => x.id == v.id));
-        _snack('Vehicle "${v.model}" deleted.');
+        setState(() {
+          _vehicles.removeWhere((x) => x.id == v.id);
+          _trashVehicles.add(v);
+        });
+        await _saveVehiclesLocally(_vehicles);
+        await _saveTrashLocally(_trashVehicles);
+        _snack('Vehicle "${v.model}" moved to trash.');
         if (_editingId == v.id) _clearForm();
       } else {
         _snack('Delete failed.', error: true);
       }
     } catch (_) {
       if (mounted) {
-        // Queue for sync when backend comes back online
         await SyncService.addOperation(SyncOperationType.deleteVehicle, {'id': v.id});
-        setState(() { _vehicles.removeWhere((x) => x.id == v.id); _backendOffline = true; });
+        setState(() {
+          _vehicles.removeWhere((x) => x.id == v.id);
+          _trashVehicles.add(v);
+          _backendOffline = true;
+        });
         await _saveVehiclesLocally(_vehicles);
-        _snack('Vehicle deleted locally (queued for sync).');
+        await _saveTrashLocally(_trashVehicles);
+        _snack('Moved to trash locally (queued for sync).');
       }
+    }
+  }
+
+  Future<void> _fetchTrashVehicles() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$kApiBaseUrl/api/vehicles/trash'))
+          .timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        final list = (json.decode(res.body) as List).map((e) => Vehicle.fromJson(e)).toList();
+        setState(() => _trashVehicles = list);
+        await _saveTrashLocally(list);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _restoreVehicle(Vehicle v) async {
+    try {
+      final res = await http
+          .post(Uri.parse('$kApiBaseUrl/api/vehicles/${v.id}/restore'))
+          .timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        setState(() => _trashVehicles.removeWhere((x) => x.id == v.id));
+        await _saveTrashLocally(_trashVehicles);
+        _snack('Vehicle "${v.model}" restored.');
+        _fetchVehicles();
+      } else {
+        _snack('Restore failed.', error: true);
+      }
+    } catch (_) {
+      if (mounted) _snack('Backend unreachable.', error: true);
     }
   }
 
@@ -367,41 +430,50 @@ class _VehiclePageState extends State<VehiclePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28),
+      padding: EdgeInsets.all(isMobile ? 12 : 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Offline banner
           if (_backendOffline) _buildOfflineBanner(),
-
-          // Page header
-          _buildPageHeader(),
-          const SizedBox(height: 24),
-
-          // Stats row
+          _buildPageHeader(isMobile),
+          SizedBox(height: isMobile ? 16 : 24),
           _buildStatsRow(),
-          const SizedBox(height: 24),
-
-          // Main two-column layout
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left – inventory
-              Expanded(
-                flex: 3,
-                child: Column(
+          SizedBox(height: isMobile ? 16 : 24),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 700;
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSearchAndFilter(),
-                    const SizedBox(height: 16),
-                    _buildInventoryTable(),
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        children: [
+                          _buildSearchAndFilter(isMobile),
+                          const SizedBox(height: 16),
+                          _buildInventoryTable(isMobile),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    SizedBox(width: math.min(constraints.maxWidth * 0.3, 320), child: _buildFormPanel()),
                   ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              // Right – registration / edit form
-              SizedBox(width: 320, child: _buildFormPanel()),
-            ],
+                );
+              } else {
+                return Column(
+                  children: [
+                    _buildSearchAndFilter(isMobile),
+                    const SizedBox(height: 16),
+                    _buildInventoryTable(isMobile),
+                    const SizedBox(height: 16),
+                    SizedBox(width: double.infinity, child: _buildFormPanel()),
+                  ],
+                );
+              }
+            },
           ),
         ],
       ),
@@ -412,7 +484,30 @@ class _VehiclePageState extends State<VehiclePage> {
   // Page header
   // ---------------------------------------------------------------------------
 
-  Widget _buildPageHeader() {
+  Widget _buildPageHeader([bool isMobile = false]) {
+    if (isMobile) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Vehicle Management', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 4),
+        const Text('Configure, monitor, and assign assets to your tactical grid.', style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _clearForm,
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('New Vehicle', style: TextStyle(fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+          ),
+        ),
+      ]);
+    }
     return Row(
       children: [
         const Expanded(
@@ -447,42 +542,63 @@ class _VehiclePageState extends State<VehiclePage> {
   // ---------------------------------------------------------------------------
 
   Widget _buildStatsRow() {
-    return Row(
-      children: [
-        _buildStatCard('TOTAL FLEET',  _vehicles.length.toString(), Icons.local_shipping,   const Color(0xFF6366F1)),
-        const SizedBox(width: 16),
-        _buildStatCard('ACTIVE',       _activeCount.toString(),      Icons.check_circle,     const Color(0xFF22C55E)),
-        const SizedBox(width: 16),
-        _buildStatCard('MAINTENANCE',  _maintenanceCount.toString(), Icons.build,            const Color(0xFFF59E0B)),
-        const SizedBox(width: 16),
-        _buildStatCard('IDLE',         _idleCount.toString(),        Icons.timer,            const Color(0xFF3B82F6)),
-      ],
+    final cards = [
+      _buildStatCard('TOTAL FLEET',  _vehicles.length.toString(), Icons.local_shipping,   const Color(0xFF6366F1)),
+      _buildStatCard('ACTIVE',       _activeCount.toString(),      Icons.check_circle,     const Color(0xFF22C55E)),
+      _buildStatCard('MAINTENANCE',  _maintenanceCount.toString(), Icons.build,            const Color(0xFFF59E0B)),
+      _buildStatCard('IDLE',         _idleCount.toString(),        Icons.timer,            const Color(0xFF3B82F6)),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return Row(
+            children: [
+              Expanded(child: cards[0]),
+              const SizedBox(width: 16),
+              Expanded(child: cards[1]),
+              const SizedBox(width: 16),
+              Expanded(child: cards[2]),
+              const SizedBox(width: 16),
+              Expanded(child: cards[3]),
+            ],
+          );
+        } else {
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[0]),
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[1]),
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[2]),
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[3]),
+            ],
+          );
+        }
+      },
     );
   }
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 0.5)),
-                Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              ],
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 0.5)),
+              Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -491,37 +607,36 @@ class _VehiclePageState extends State<VehiclePage> {
   // Search + filter
   // ---------------------------------------------------------------------------
 
-  Widget _buildSearchAndFilter() {
-    return Row(
+  Widget _buildSearchAndFilter([bool isMobile = false]) {
+    return Column(
       children: [
-        // Search
-        Expanded(
-          child: Container(
-            height: 40,
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                    decoration: const InputDecoration(
-                      hintText: 'Search model, plate, tracker…',
-                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
+        Container(
+          height: 40,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: const InputDecoration(
+                    hintText: 'Search model, plate, tracker…',
+                    hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    border: InputBorder.none,
+                    isDense: true,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 12),
-        // Status filter chips
-        ..._statusFilters.map((f) => _buildFilterChip(f)),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: _statusFilters.map((f) => _buildFilterChip(f)).toList()),
+        ),
       ],
     );
   }
@@ -548,75 +663,248 @@ class _VehiclePageState extends State<VehiclePage> {
   // Inventory table
   // ---------------------------------------------------------------------------
 
-  Widget _buildInventoryTable() {
+  Widget _buildInventoryTable([bool isMobile = false]) {
+    final tableContent = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+        child: Row(
+          children: [
+            const Expanded(flex: 3, child: Text('MODEL / PLATE', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
+            const Expanded(flex: 2, child: Text('STATUS',        style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
+            const Expanded(flex: 3, child: Text('GPS TRACKER',   style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
+            SizedBox(width: isMobile ? 64 : 80, child: const Text('ACTIONS', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
+          ],
+        ),
+      ),
+      if (_isLoading)
+        const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
+      else if (_showTrash && _trashVehicles.isEmpty)
+        const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Trash is empty.', style: TextStyle(color: Color(0xFF94A3B8)))))
+      else if (_showTrash)
+        ..._trashVehicles.map((v) => _buildTrashRow(v, isMobile))
+      else if (_filtered.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(32),
+          child: Center(child: Text(_vehicles.isEmpty ? 'No vehicles found.' : 'No vehicles match the filter.',
+              style: const TextStyle(color: Color(0xFF94A3B8)))),
+        )
+      else
+        ..._filtered.map((v) => _buildVehicleRow(v, isMobile)),
+      const SizedBox(height: 8),
+    ]);
+
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-            child: Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF475569)),
-                const SizedBox(width: 8),
-                const Text('Fleet Inventory', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                  child: Text('${_filtered.length} ASSETS', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
-                ),
-              ],
-            ),
+            padding: EdgeInsets.fromLTRB(isMobile ? 12 : 20, isMobile ? 12 : 20, isMobile ? 12 : 20, 0),
+            child: isMobile
+                ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      const Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF475569)),
+                      const SizedBox(width: 8),
+                      const Text('Fleet Inventory', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
+                      const Spacer(),
+                      _buildIconToggle(),
+                    ]),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Text(_showTrash ? '${_trashVehicles.length} DELETED' : '${_filtered.length} ASSETS',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                    ),
+                  ])
+                : Row(children: [
+                    const Icon(Icons.inventory_2_outlined, size: 18, color: Color(0xFF475569)),
+                    const SizedBox(width: 8),
+                    const Text('Fleet Inventory', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
+                    const Spacer(),
+                    _buildIconToggle(),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0xFF2563EB).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Text(_showTrash ? '${_trashVehicles.length} DELETED' : '${_filtered.length} ASSETS',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                    ),
+                  ]),
           ),
           const SizedBox(height: 16),
-
-          // Column headers
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
-            child: const Row(
-              children: [
-                Expanded(flex: 3, child: Text('MODEL / PLATE', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
-                Expanded(flex: 2, child: Text('STATUS',        style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
-                Expanded(flex: 3, child: Text('GPS TRACKER',   style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
-                SizedBox(width: 80, child: Text('ACTIONS',     style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF64748B), fontSize: 11))),
-              ],
-            ),
-          ),
-
-          // Rows
-          if (_isLoading)
-            const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator()))
-          else if (_filtered.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(32),
-              child: Center(child: Text(_vehicles.isEmpty ? 'No vehicles found.' : 'No vehicles match the filter.',
-                  style: const TextStyle(color: Color(0xFF94A3B8)))),
-            )
-          else
-            ..._filtered.map((v) => _buildVehicleRow(v)),
-
-          const SizedBox(height: 8),
+          isMobile
+              ? Column(children: [
+                  if (_isLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+                  else if (_showTrash && _trashVehicles.isEmpty)
+                    const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Trash is empty.', style: TextStyle(color: Color(0xFF94A3B8)))))
+                  else if (_showTrash)
+                    ..._trashVehicles.map((v) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildMobileTrashCard(v)))
+                  else if (_filtered.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(child: Text(_vehicles.isEmpty ? 'No vehicles found.' : 'No vehicles match the filter.',
+                          style: const TextStyle(color: Color(0xFF94A3B8)))),
+                    )
+                  else
+                    ..._filtered.map((v) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildMobileVehicleCard(v))),
+                ])
+              : tableContent,
         ],
       ),
     );
   }
 
-  Widget _buildVehicleRow(Vehicle v) {
+  Widget _buildMobileVehicleCard(Vehicle v) {
+    final sc = _statusColor(v.status);
+    final isEditingThis = _editingId == v.id;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isEditingThis ? const Color(0xFFF0F9FF) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+            child: Icon(Icons.local_shipping, color: sc, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(v.model, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+            Text(v.plate, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+          ])),
+          _statusBadge(v.status),
+          const SizedBox(width: 4),
+          _iconBtn(Icons.edit_outlined, const Color(0xFF3B82F6), () => _startEdit(v), tooltip: 'Edit'),
+          const SizedBox(width: 2),
+          _iconBtn(Icons.delete_outline, const Color(0xFFEF4444), () => _deleteVehicle(v), tooltip: 'Delete'),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Icon(Icons.satellite_alt, size: 12, color: v.tracker == 'Not Assigned' ? const Color(0xFFEF4444) : const Color(0xFF64748B)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(v.tracker,
+              style: TextStyle(fontSize: 11, color: v.tracker == 'Not Assigned' ? const Color(0xFFEF4444) : const Color(0xFF475569)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildMobileTrashCard(Vehicle v) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(8)),
+          child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(v.model, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFEF4444))),
+          Text(v.plate, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+        ])),
+        IconButton(
+          icon: const Icon(Icons.restore_from_trash, color: Color(0xFF3B82F6), size: 20),
+          tooltip: 'Restore',
+          onPressed: () => _restoreVehicle(v),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildIconToggle() {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _showTrash = !_showTrash);
+        if (_showTrash) _fetchTrashVehicles();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _showTrash ? const Color(0xFFFEF2F2) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _showTrash ? const Color(0xFFFECACA) : const Color(0xFFE2E8F0)),
+        ),
+        child: Icon(
+          _showTrash ? Icons.devices : Icons.delete_outline,
+          size: 18,
+          color: _showTrash ? const Color(0xFFEF4444) : const Color(0xFF64748B),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrashRow(Vehicle v, [bool isMobile = false]) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 14),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))),
+      child: Row(
+        children: [
+          Expanded(flex: 3, child: Row(
+            children: [
+              Container(
+                width: 42, height: 42,
+                decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(v.model, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFEF4444))),
+                  Text(v.plate, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                ],
+              )),
+            ],
+          )),
+          Expanded(flex: 2, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(20)),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.delete, size: 12, color: Color(0xFFEF4444)),
+                SizedBox(width: 5),
+                Text('DELETED', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600, fontSize: 11)),
+              ],
+            ),
+          )),
+          Expanded(flex: 3, child: Text(v.tracker, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12))),
+          SizedBox(
+            width: isMobile ? 56 : 80,
+            child: IconButton(
+              icon: const Icon(Icons.restore_from_trash, color: Color(0xFF3B82F6)),
+              tooltip: 'Restore',
+              onPressed: () => _restoreVehicle(v),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleRow(Vehicle v, [bool isMobile = false]) {
     final isEditingThis = _editingId == v.id;
     final sc = _statusColor(v.status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 14),
       decoration: BoxDecoration(
         color: isEditingThis ? const Color(0xFFF0F9FF) : Colors.transparent,
         border: const Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
       ),
       child: Row(
         children: [
-          // Model / Plate
           Expanded(
             flex: 3,
             child: Row(
@@ -639,9 +927,7 @@ class _VehiclePageState extends State<VehiclePage> {
               ],
             ),
           ),
-          // Status
           Expanded(flex: 2, child: _statusBadge(v.status)),
-          // Tracker
           Expanded(
             flex: 3,
             child: Row(
@@ -661,9 +947,8 @@ class _VehiclePageState extends State<VehiclePage> {
               ],
             ),
           ),
-          // Actions
           SizedBox(
-            width: 80,
+            width: isMobile ? 64 : 80,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

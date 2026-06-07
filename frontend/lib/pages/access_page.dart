@@ -1,11 +1,11 @@
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'dart:convert';
 import '../constants.dart';
-import '../widgets/qr_scanner_stub.dart' if (dart.library.html) '../widgets/web_qr_scanner.dart';
+import '../widgets/plate_scanner_stub.dart' if (dart.library.html) '../widgets/plate_scanner_web.dart';
+import 'dart:math' as math;
 
 class AccessControlPage extends StatefulWidget {
   const AccessControlPage({super.key});
@@ -68,8 +68,38 @@ class _AccessControlPageState extends State<AccessControlPage> {
         return;
       }
     } catch (_) {}
-    if (mounted) setState(() { _isLoading = false; _backendOffline = true; });
+    if (mounted) { setState(() {
+      _isLoading = false;
+      _backendOffline = true;
+      _rules = _mockRules;
+    }); }
   }
+
+  static List<Map<String, dynamic>> get _mockRules => [
+    {'id': 1, 'vehicle_plate': '123-TUN-45', 'vehicle_model': 'Mercedes-Benz Actros', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 2, 'vehicle_plate': '123-TUN-45', 'vehicle_model': 'Mercedes-Benz Actros', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 3, 'vehicle_plate': '456-NBL-78', 'vehicle_model': 'Scania R-Series', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 4, 'vehicle_plate': '456-NBL-78', 'vehicle_model': 'Scania R-Series', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 5, 'vehicle_plate': '789-SF-01', 'vehicle_model': 'Volvo FH', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 6, 'vehicle_plate': '789-SF-01', 'vehicle_model': 'Volvo FH', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 7, 'vehicle_plate': '111-ARI-22', 'vehicle_model': 'MAN TGX', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 8, 'vehicle_plate': '333-BEN-44', 'vehicle_model': 'DAF XF', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 9, 'vehicle_plate': '555-MON-66', 'vehicle_model': 'Renault Trucks T', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 10, 'vehicle_plate': '777-SUS-88', 'vehicle_model': 'Mercedes-Benz Arocs', 'allowed': false, 'gate': 'Entrée', 'time_start': '06:00', 'time_end': '22:00', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 11, 'vehicle_plate': 'FI-202-IK', 'vehicle_model': 'Scania G-Series', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 12, 'vehicle_plate': 'NN-303-LP', 'vehicle_model': 'Volvo FM', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 13, 'vehicle_plate': 'FR-606-TY', 'vehicle_model': 'Ford F-MAX', 'allowed': false, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 14, 'vehicle_plate': 'CO-7710-D', 'vehicle_model': 'DAF CF', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 15, 'vehicle_plate': 'CO-7710-D', 'vehicle_model': 'DAF CF', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 16, 'vehicle_plate': 'HY-505-UI', 'vehicle_model': 'Iveco S-Way', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 17, 'vehicle_plate': 'HY-505-UI', 'vehicle_model': 'Iveco S-Way', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 18, 'vehicle_plate': 'TY-404-ER', 'vehicle_model': 'MAN TGS', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 19, 'vehicle_plate': 'TY-404-ER', 'vehicle_model': 'MAN TGS', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 20, 'vehicle_plate': 'FR-4401-P', 'vehicle_model': 'Renault Trucks D', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 21, 'vehicle_plate': 'FR-4401-P', 'vehicle_model': 'Renault Trucks D', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 22, 'vehicle_plate': '199 تونس 199', 'vehicle_model': 'Citroën C3', 'allowed': true, 'gate': 'Entrée', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+    {'id': 23, 'vehicle_plate': '199 تونس 199', 'vehicle_model': 'Citroën C3', 'allowed': true, 'gate': 'Sortie', 'time_start': '00:00', 'time_end': '23:59', 'created_at': '2025-01-01T00:00:00'},
+  ];
 
   Future<void> _fetchLogs() async {
     try {
@@ -80,9 +110,25 @@ class _AccessControlPageState extends State<AccessControlPage> {
       if (!mounted) return;
       if (res.statusCode == 200) {
         setState(() { _logs = List<Map<String, dynamic>>.from(json.decode(res.body)); });
+        return;
       }
     } catch (_) {}
+    if (mounted && _logs.isEmpty) {
+      setState(() { _logs = _mockLogs; });
+    }
   }
+
+  static List<Map<String, dynamic>> get _mockLogs => [
+    {'id': 1, 'vehicle_plate': '123-TUN-45', 'action': 'ENTRY', 'gate': 'Entrée', 'granted': true, 'reason': 'Accès autorisé', 'timestamp': DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String()},
+    {'id': 2, 'vehicle_plate': '789-SF-01', 'action': 'EXIT', 'gate': 'Sortie', 'granted': true, 'reason': 'Sortie enregistrée', 'timestamp': DateTime.now().subtract(const Duration(minutes: 15)).toIso8601String()},
+    {'id': 3, 'vehicle_plate': '111-ARI-22', 'action': 'ENTRY', 'gate': 'Entrée', 'granted': true, 'reason': 'Véhicule connu', 'timestamp': DateTime.now().subtract(const Duration(minutes: 30)).toIso8601String()},
+    {'id': 4, 'vehicle_plate': 'FR-606-TY', 'action': 'ENTRY', 'gate': 'Entrée', 'granted': false, 'reason': 'Plaque non autorisée', 'timestamp': DateTime.now().subtract(const Duration(hours: 1)).toIso8601String()},
+    {'id': 5, 'vehicle_plate': '123-TUN-45', 'action': 'EXIT', 'gate': 'Sortie', 'granted': true, 'reason': 'Sortie enregistrée', 'timestamp': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String()},
+    {'id': 6, 'vehicle_plate': '456-NBL-78', 'action': 'ENTRY', 'gate': 'Entrée', 'granted': true, 'reason': 'Accès autorisé', 'timestamp': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String()},
+    {'id': 7, 'vehicle_plate': '777-SUS-88', 'action': 'ENTRY', 'gate': 'Entrée', 'granted': false, 'reason': 'Accès refusé par règle', 'timestamp': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String()},
+    {'id': 8, 'vehicle_plate': '333-BEN-44', 'action': 'EXIT', 'gate': 'Sortie', 'granted': true, 'reason': 'Sortie enregistrée', 'timestamp': DateTime.now().subtract(const Duration(hours: 5)).toIso8601String()},
+    {'id': 9, 'vehicle_plate': '199 تونس 199', 'action': 'ENTRY', 'gate': 'Entrée', 'granted': true, 'reason': 'Accès autorisé', 'timestamp': DateTime.now().subtract(const Duration(minutes: 2)).toIso8601String()},
+  ];
 
   String _timeAgo(String? ts) {
     if (ts == null) return '';
@@ -98,12 +144,87 @@ class _AccessControlPageState extends State<AccessControlPage> {
     }
   }
 
-  // ── Unified Scan (YOLO then QR fallback) ──
-
-  bool _scanning = false;
+  // ── Scan with camera preview + guide overlay ──
 
   Future<void> _scanGate() async {
-    setState(() => _scanning = true);
+    if (kIsWeb) {
+      await _webPlateScanLive();
+    } else {
+      await _mobileScan();
+    }
+  }
+
+  Future<void> _webPlateScanLive() async {
+    String? detectedPlate;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _WebVerifyLiveDialog(
+        gateMode: _gateMode,
+        onVerify: (plate) {
+          detectedPlate = plate;
+          Navigator.of(ctx).pop();
+        },
+        onClose: () => Navigator.of(ctx).pop(),
+      ),
+    );
+
+    if (!mounted || detectedPlate == null) return;
+    _checkPlateAccess(detectedPlate!);
+  }
+
+  Future<void> _mobileScan() async {
+    final doScan = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          width: math.min(MediaQuery.of(context).size.width - 32, 360),
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              height: 160, width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: CustomPaint(painter: _PlateGuidePainter(), size: const Size(360, 160)),
+            ),
+            const SizedBox(height: 20),
+            const Text('Centrez la plaque dans le cadre',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+            const SizedBox(height: 6),
+            const Text('Le scan utilise la caméra du serveur',
+                style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)), textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Annuler'),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                icon: const Icon(Icons.camera_alt, size: 18),
+                label: const Text('Lancer le scan'),
+              ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+
+    if (doScan != true || !mounted) return;
+    setState(() => _isLoading = true);
+
     String? plate;
     bool granted = false;
     String reason = 'Erreur de scan';
@@ -115,8 +236,7 @@ class _AccessControlPageState extends State<AccessControlPage> {
         Uri.parse('$kApiBaseUrl/api/yolo/scan'),
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $_token'},
         body: json.encode({'gate': _gateMode}),
-      ).timeout(const Duration(seconds: 15));
-
+      );
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         plate = data['plate'];
@@ -124,196 +244,27 @@ class _AccessControlPageState extends State<AccessControlPage> {
         reason = data['reason'] ?? '';
         imageB64 = data['image_b64'];
         action = data['action'] ?? '';
+      } else if (res.statusCode == 503) {
+        try {
+          final data = json.decode(res.body);
+          reason = data['detail'] ?? 'Caméra serveur indisponible';
+        } catch (_) {
+          reason = 'Caméra serveur indisponible';
+        }
+      } else {
+        reason = 'Erreur serveur (${res.statusCode})';
       }
-    } catch (_) {}
-
-    setState(() => _scanning = false);
-    if (!mounted) return;
-
-    if (plate != null) {
-      _showScanResult(plate, granted, reason, imageB64, action);
-      _fetchLogs();
-      return;
+    } catch (_) {
+      reason = 'Backend hors ligne';
     }
 
-    _openPlateScanner();
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    _showScanResult(plate, granted, reason, imageB64, action);
+    if (plate != null) _fetchLogs();
   }
 
-  void _openPlateScanner() {
-    if (kIsWeb) { _openWebScanner(); }
-    else { _openMobileScanner(); }
-  }
 
-  void _openMobileScanner() {
-    final controller = MobileScannerController(autoStart: true, facing: CameraFacing.back);
-    bool hasScanned = false;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: EdgeInsets.zero,
-          content: SizedBox(
-            width: 400,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: SizedBox(
-                  height: 300, width: double.infinity,
-                  child: MobileScanner(
-                    controller: controller,
-                    onDetect: (BarcodeCapture capture) {
-                      if (hasScanned) return;
-                      final barcode = capture.barcodes.firstOrNull;
-                      if (barcode?.rawValue == null || barcode!.rawValue!.isEmpty) return;
-                      hasScanned = true;
-                      Navigator.of(dialogCtx).pop();
-                      controller.dispose();
-                      _checkPlateAccess(barcode.rawValue!.trim().toUpperCase());
-                    },
-                    errorBuilder: (context, error, child) => Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text('Camera error: $error', style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                      child: const Icon(Icons.keyboard, size: 14, color: Color(0xFF3B82F6)),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('SAISIE MANUELLE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey.shade400, letterSpacing: 1)),
-                  ]),
-                  const SizedBox(height: 8),
-                  TextField(
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: InputDecoration(
-                      hintText: 'e.g. BT-904-TX',
-                      filled: true, fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      prefixIcon: const Icon(Icons.directions_car, size: 18, color: Color(0xFF64748B)),
-                    ),
-                    onSubmitted: (value) {
-                      final plate = value.trim().toUpperCase();
-                      if (plate.isNotEmpty) {
-                        Navigator.pop(dialogCtx);
-                        controller.dispose();
-                        _checkPlateAccess(plate);
-                      }
-                    },
-                  ),
-                ]),
-              ),
-            ]),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () { controller.dispose(); Navigator.pop(dialogCtx); },
-              child: const Text('Fermer', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-          ],
-        ),
-      ),
-    ).then((_) { try { controller.dispose(); } catch (_) {} });
-  }
-
-  void _openWebScanner() {
-    bool hasScanned = false;
-    bool cameraFailed = false;
-    String? errorMessage;
-    final manualCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: EdgeInsets.zero,
-          content: SizedBox(
-            width: 400,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                height: cameraFailed ? 180 : 360,
-                width: double.infinity,
-                decoration: const BoxDecoration(color: Colors.black, borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-                clipBehavior: Clip.antiAlias,
-                child: cameraFailed
-                    ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.videocam_off, color: Colors.red, size: 48),
-                        const SizedBox(height: 12),
-                        Text(errorMessage ?? 'Caméra non disponible', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: () { cameraFailed = false; errorMessage = null; setDialogState(() {}); },
-                          icon: const Icon(Icons.refresh, size: 16, color: Colors.white),
-                          label: const Text('Réessayer', style: TextStyle(color: Colors.white)),
-                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white38)),
-                        ),
-                      ]))
-                    : WebQrScannerWidget(
-                        onScan: (scannedId) {
-                          if (hasScanned) return;
-                          hasScanned = true;
-                          Navigator.of(dialogCtx).pop();
-                          _checkPlateAccess(scannedId.trim().toUpperCase());
-                        },
-                        onError: (msg) { cameraFailed = true; errorMessage = msg ?? 'Erreur caméra'; setDialogState(() {}); },
-                      ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                      child: const Icon(Icons.keyboard, size: 14, color: Color(0xFF3B82F6)),
-                    ),
-                    const SizedBox(width: 8),
-                    Text('SAISIE MANUELLE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey.shade400, letterSpacing: 1)),
-                  ]),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: manualCtrl,
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.characters,
-                    decoration: InputDecoration(
-                      hintText: 'e.g. BT-904-TX',
-                      filled: true, fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      prefixIcon: const Icon(Icons.directions_car, size: 18, color: Color(0xFF64748B)),
-                    ),
-                    onSubmitted: (value) {
-                      final plate = value.trim().toUpperCase();
-                      if (plate.isNotEmpty) {
-                        Navigator.pop(dialogCtx);
-                        _checkPlateAccess(plate);
-                      }
-                    },
-                  ),
-                ]),
-              ),
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () { Navigator.pop(dialogCtx); }, child: const Text('Fermer', style: TextStyle(color: Color(0xFF64748B)))),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _checkPlateAccess(String plate) async {
     setState(() => _isLoading = true);
@@ -359,7 +310,7 @@ class _AccessControlPageState extends State<AccessControlPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
         content: Container(
-          width: 360,
+          width: math.min(MediaQuery.of(context).size.width - 32, 360),
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Container(
@@ -407,11 +358,8 @@ class _AccessControlPageState extends State<AccessControlPage> {
     );
   }
 
-
   void _showScanResult(String? plate, bool granted, String reason, String? imageB64, String action) {
-    final isEntry = action == 'ENTRY';
     final isExit = action == 'EXIT';
-    final success = isExit || granted;
 
     Color resultColor;
     IconData resultIcon;
@@ -442,7 +390,7 @@ class _AccessControlPageState extends State<AccessControlPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: EdgeInsets.zero,
         content: Container(
-          width: 380,
+          width: math.min(MediaQuery.of(context).size.width - 32, 380),
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             if (imageB64 != null) ...[
@@ -495,12 +443,17 @@ class _AccessControlPageState extends State<AccessControlPage> {
           ]),
         ),
         actions: [
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Fermer', style: TextStyle(fontSize: 14)),
-            ),
-            if (plate == null)
+          if (plate == null) ...[
+            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openManualEntry();
+                },
+                icon: const Icon(Icons.keyboard, size: 16),
+                label: const Text('Saisie manuelle', style: TextStyle(fontSize: 14)),
+              ),
+              const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: () {
                   Navigator.pop(ctx);
@@ -509,13 +462,71 @@ class _AccessControlPageState extends State<AccessControlPage> {
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('Réessayer', style: TextStyle(fontSize: 14)),
               ),
-          ]),
+            ]),
+          ] else ...[
+            Center(child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer', style: TextStyle(fontSize: 14)))),
+          ],
         ],
       ),
     );
   }
 
-  // ── Access Rules CRUD ──
+  void _openManualEntry() {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.keyboard, size: 20, color: Color(0xFF0F172A)),
+          SizedBox(width: 10),
+          Text('Saisie manuelle', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ]),
+        content: SizedBox(
+          width: math.min(MediaQuery.of(context).size.width - 32, 350),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Entrez la plaque d\'immatriculation :', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                hintText: 'e.g. 123-TUN-45',
+                filled: true, fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.directions_car, size: 18, color: Color(0xFF64748B)),
+              ),
+              onSubmitted: (value) {
+                final plate = value.trim().toUpperCase();
+                if (plate.isNotEmpty) {
+                  Navigator.pop(ctx);
+                  _checkPlateAccess(plate);
+                }
+              },
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler', style: TextStyle(color: Color(0xFF64748B)))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              final plate = ctrl.text.trim().toUpperCase();
+              if (plate.isEmpty) return;
+              Navigator.pop(ctx);
+              _checkPlateAccess(plate);
+            },
+            child: const Text('Vérifier'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _showRuleDialog({Map<String, dynamic>? rule}) {
     final isEdit = rule != null;
@@ -535,10 +546,10 @@ class _AccessControlPageState extends State<AccessControlPage> {
             Text(isEdit ? 'Modifier la règle' : 'Nouvelle règle'),
           ]),
           content: SizedBox(
-            width: 400,
+            width: math.min(MediaQuery.of(context).size.width - 32, 400),
             child: SingleChildScrollView(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(controller: plateCtrl, decoration: const InputDecoration(labelText: 'Plaque', hintText: 'e.g. BT-904-TX', filled: true, fillColor: Color(0xFFF8FAFC), border: OutlineInputBorder(), prefixIcon: Icon(Icons.directions_car, size: 18))),
+                TextField(controller: plateCtrl, decoration: const InputDecoration(labelText: 'Plaque', hintText: 'e.g. 123-TUN-45', filled: true, fillColor: Color(0xFFF8FAFC), border: OutlineInputBorder(), prefixIcon: Icon(Icons.directions_car, size: 18))),
                 const SizedBox(height: 14),
                 TextField(controller: modelCtrl, decoration: const InputDecoration(labelText: 'Modèle (optionnel)', filled: true, fillColor: Color(0xFFF8FAFC), border: OutlineInputBorder(), prefixIcon: Icon(Icons.model_training, size: 18))),
                 const SizedBox(height: 14),
@@ -587,6 +598,20 @@ class _AccessControlPageState extends State<AccessControlPage> {
                   'allowed': allowed,
                   'gate': gate,
                 };
+                if (_backendOffline) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  setState(() {
+                    if (isEdit) {
+                      final idx = _rules.indexWhere((r) => r['id'] == rule['id']);
+                      if (idx >= 0) _rules[idx] = {..._rules[idx], ...body};
+                    } else {
+                      final newId = _rules.isEmpty ? 1 : (_rules.map((r) => r['id'] as int).reduce(math.max) + 1);
+                      _rules.add({...body, 'id': newId, 'time_start': '00:00', 'time_end': '23:59', 'created_at': DateTime.now().toIso8601String()});
+                    }
+                  });
+                  _showSnack(isEdit ? 'Règle modifiée' : 'Règle créée');
+                  return;
+                }
                 try {
                   final res = isEdit
                     ? await http.put(
@@ -629,6 +654,11 @@ class _AccessControlPageState extends State<AccessControlPage> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
             onPressed: () async {
               Navigator.pop(context);
+              if (_backendOffline) {
+                setState(() => _rules.removeWhere((r) => r['id'] == ruleId));
+                _showSnack('Règle supprimée');
+                return;
+              }
               try {
                 await http.delete(
                   Uri.parse('$kApiBaseUrl/api/access/rules/$ruleId'),
@@ -646,6 +676,12 @@ class _AccessControlPageState extends State<AccessControlPage> {
   }
 
   void _toggleRule(Map<String, dynamic> rule) async {
+    if (_backendOffline) {
+      setState(() {
+        rule['allowed'] = !(rule['allowed'] ?? true);
+      });
+      return;
+    }
     try {
       await http.put(
         Uri.parse('$kApiBaseUrl/api/access/rules/${rule['id']}'),
@@ -706,20 +742,22 @@ class _AccessControlPageState extends State<AccessControlPage> {
           ]),
         ),
         // Header
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Contrôle d\'accès', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             const SizedBox(height: 2),
             Text('${_logs.length} accès enregistrés · $uniquePlates plaques uniques',
                 style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-          ]),
-          Flexible(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+          ])),
+          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
             _buildGateSelector(),
             const SizedBox(width: 8),
             _buildButton('Scanner', Icons.qr_code_scanner, onTap: _scanGate, isPrimary: true),
             const SizedBox(width: 8),
+            _buildButton('Saisie', Icons.keyboard, onTap: _openManualEntry),
+            const SizedBox(width: 8),
             _buildButton('Actualiser', Icons.refresh, onTap: () { _fetchRules(); _fetchLogs(); }),
-          ]))),
+          ])),
         ]),
         const SizedBox(height: 20),
 
@@ -751,37 +789,58 @@ class _AccessControlPageState extends State<AccessControlPage> {
   }
 
   Widget _buildStatsRow() {
-    return Row(children: [
+    final cards = [
       _statCard('Règles', '$_allowedCount', Icons.shield_outlined, const Color(0xFF0F172A), '$_blockedCount bloquées'),
-      const SizedBox(width: 12),
       _statCard('Accès', '$_grantedCount', Icons.check_circle, const Color(0xFF10B981), '$_deniedCount refusés'),
-      const SizedBox(width: 12),
       _statCard('Aujourd\'hui', '$_todayGranted', Icons.today, const Color(0xFF3B82F6), '$_todayDenied refusés'),
-      const SizedBox(width: 12),
       _statCard('Portes', '${_gates.length}', Icons.door_front_door, const Color(0xFF8B5CF6), 'actives'),
-    ]);
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return Row(children: [
+            Expanded(child: cards[0]),
+            const SizedBox(width: 12),
+            Expanded(child: cards[1]),
+            const SizedBox(width: 12),
+            Expanded(child: cards[2]),
+            const SizedBox(width: 12),
+            Expanded(child: cards[3]),
+          ]);
+        } else {
+          return Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[0]),
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[1]),
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[2]),
+              SizedBox(width: (constraints.maxWidth - 12) / 2, child: cards[3]),
+            ],
+          );
+        }
+      },
+    );
   }
 
   Widget _statCard(String label, String value, IconData icon, Color color, String subtitle) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const Spacer(),
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-          ]),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
-          Text(subtitle, style: const TextStyle(fontSize: 9, color: Color(0xFFCBD5E1))),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const Spacer(),
+          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
         ]),
-      ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500)),
+        Text(subtitle, style: const TextStyle(fontSize: 9, color: Color(0xFFCBD5E1))),
+      ]),
     );
   }
 
@@ -850,51 +909,67 @@ class _AccessControlPageState extends State<AccessControlPage> {
   }
 
   Widget _buildTodaySection() {
-    if (_todayLogs.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-            child: const Icon(Icons.today, size: 16, color: Color(0xFF3B82F6)),
-          ),
-          const SizedBox(width: 10),
-          const Text('Activité aujourd\'hui', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
-          const Spacer(),
-          Text('${_todayLogs.length} événements', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-        ]),
-        const SizedBox(height: 14),
-        // Barre de proportion autorisé/refusé
-        if (_todayGranted + _todayDenied > 0) ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: SizedBox(
-            height: 8,
-            child: Row(children: [
-              Flexible(
-                flex: _todayGranted,
-                child: Container(color: const Color(0xFF10B981)),
+    return GestureDetector(
+      onTap: () => setState(() => _tabIndex = 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+              child: const Icon(Icons.today, size: 16, color: Color(0xFF3B82F6)),
+            ),
+            const SizedBox(width: 10),
+            const Text('Activité aujourd\'hui', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
+            const Spacer(),
+            Text('${_todayLogs.length} événements', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
+          ]),
+          if (_todayLogs.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Row(children: [
+                Icon(Icons.info_outline, size: 14, color: Color(0xFF94A3B8)),
+                SizedBox(width: 6),
+                Text('Aucune activité aujourd\'hui — cliquez pour voir les autorisations',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+              ]),
+            )
+          else ...[
+            const SizedBox(height: 14),
+            // Barre de proportion autorisé/refusé
+            if (_todayGranted + _todayDenied > 0) ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                height: 8,
+                child: Row(children: [
+                  Flexible(
+                    flex: _todayGranted,
+                    child: Container(color: const Color(0xFF10B981)),
+                  ),
+                  if (_todayDenied > 0)
+                    Flexible(
+                      flex: _todayDenied,
+                      child: Container(color: const Color(0xFFEF4444)),
+                    ),
+                ]),
               ),
-              if (_todayDenied > 0)
-                Flexible(
-                  flex: _todayDenied,
-                  child: Container(color: const Color(0xFFEF4444)),
-                ),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              _miniStat(Icons.check_circle, '$_todayGranted autorisés', const Color(0xFF10B981)),
+              const SizedBox(width: 16),
+              _miniStat(Icons.cancel, '$_todayDenied refusés', const Color(0xFFEF4444)),
             ]),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(children: [
-          _miniStat(Icons.check_circle, '$_todayGranted autorisés', const Color(0xFF10B981)),
-          const SizedBox(width: 16),
-          _miniStat(Icons.cancel, '$_todayDenied refusés', const Color(0xFFEF4444)),
+            const SizedBox(height: 12),
+            // Derniers scans du jour
+            ..._todayLogs.take(5).map((l) => _todayLogRow(l)),
+          ],
         ]),
-        const SizedBox(height: 12),
-        // Derniers scans du jour
-        ..._todayLogs.take(5).map((l) => _todayLogRow(l)),
-      ]),
+      ),
     );
   }
 
@@ -916,10 +991,10 @@ class _AccessControlPageState extends State<AccessControlPage> {
           decoration: BoxDecoration(shape: BoxShape.circle, color: granted ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
         ),
         const SizedBox(width: 8),
-        Text(l['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A))),
+        Expanded(child: Text(l['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
         const SizedBox(width: 8),
         Text(l['gate'] ?? '', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-        const Spacer(),
+        const SizedBox(width: 8),
         Text(granted ? '✓' : '✗', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: granted ? const Color(0xFF10B981) : const Color(0xFFEF4444))),
       ]),
     );
@@ -1016,7 +1091,7 @@ class _AccessControlPageState extends State<AccessControlPage> {
           child: Icon(allowed ? Icons.check_circle : Icons.cancel, color: allowed ? Colors.green : Colors.red, size: 22),
         ),
         title: Row(children: [
-          Text(r['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
+          Expanded(child: Text(r['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
           if (r['vehicle_model'] != null) ...[
             const SizedBox(width: 8),
             Container(
@@ -1029,28 +1104,31 @@ class _AccessControlPageState extends State<AccessControlPage> {
         subtitle: Row(children: [
           const Icon(Icons.door_front_door, size: 12, color: Color(0xFF94A3B8)),
           const SizedBox(width: 4),
-          Text(r['gate'] ?? '', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-          const SizedBox(width: 12),
+          Flexible(child: Text(r['gate'] ?? '', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11), overflow: TextOverflow.ellipsis)),
+          const SizedBox(width: 8),
           const Icon(Icons.access_time, size: 12, color: Color(0xFF94A3B8)),
           const SizedBox(width: 4),
-          Text('${r['time_start'] ?? '00:00'} - ${r['time_end'] ?? '23:59'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-        ]),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(child: Text('${r['time_start'] ?? '00:00'} - ${r['time_end'] ?? '23:59'}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11), overflow: TextOverflow.ellipsis)),
+          const Spacer(),
           Switch(
             value: allowed,
             onChanged: (_) => _toggleRule(r),
             activeTrackColor: Colors.green,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-            onPressed: () => _showRuleDialog(rule: r),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-            onPressed: () => _deleteRule(r['id'], r['vehicle_plate'] ?? ''),
-          ),
         ]),
+        trailing: PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          onSelected: (action) {
+            if (action == 'edit') _showRuleDialog(rule: r);
+            if (action == 'delete') _deleteRule(r['id'], r['vehicle_plate'] ?? '');
+          },
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Modifier')])),
+            const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Supprimer', style: TextStyle(color: Colors.red))])),
+          ],
+        ),
       ),
     );
   }
@@ -1117,21 +1195,21 @@ class _AccessControlPageState extends State<AccessControlPage> {
             child: Icon(granted ? Icons.check_circle : Icons.cancel, size: 16, color: granted ? Colors.green : Colors.red),
           ),
           const SizedBox(width: 10),
-          Text(l['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+          Text(l['vehicle_plate'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
         ])),
         Expanded(flex: 1, child: Row(children: [
           Icon(action == 'ENTRY' ? Icons.login : Icons.logout, size: 14, color: const Color(0xFF64748B)),
           const SizedBox(width: 4),
-          Text(action == 'ENTRY' ? 'Entrée' : 'Sortie', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+          Flexible(child: Text(action == 'ENTRY' ? 'Entrée' : 'Sortie', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12), overflow: TextOverflow.ellipsis)),
         ])),
-        Expanded(flex: 1, child: Text(l['gate'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+        Expanded(flex: 1, child: Text(l['gate'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 12), overflow: TextOverflow.ellipsis)),
         Expanded(flex: 1, child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             color: granted ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(granted ? 'AUTORISÉ' : 'REFUSÉ', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: granted ? Colors.green : Colors.red)),
+          child: Text(granted ? 'OK' : 'NON', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: granted ? Colors.green : Colors.red), textAlign: TextAlign.center),
         )),
         Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_timeAgo(l['timestamp'] as String?), style: const TextStyle(color: Color(0xFF0F172A), fontSize: 11, fontWeight: FontWeight.w500)),
@@ -1201,4 +1279,193 @@ class _AccessControlPageState extends State<AccessControlPage> {
       ),
     );
   }
+}
+
+class _WebVerifyLiveDialog extends StatefulWidget {
+  final String gateMode;
+  final ValueChanged<String> onVerify;
+  final VoidCallback onClose;
+
+  const _WebVerifyLiveDialog({
+    required this.gateMode,
+    required this.onVerify,
+    required this.onClose,
+  });
+
+  @override
+  State<_WebVerifyLiveDialog> createState() => _WebVerifyLiveDialogState();
+}
+
+class _WebVerifyLiveDialogState extends State<_WebVerifyLiveDialog> {
+  String? _detectedPlate;
+  String? _imageB64;
+  bool _scanFailed = false;
+  int _scanKey = 0;
+
+  void _onPlateCaptured(ScanResult result) {
+    if (result.plate == null) {
+      setState(() => _scanFailed = true);
+      return;
+    }
+    setState(() {
+      _detectedPlate = result.plate;
+      _imageB64 = result.imageB64;
+    });
+  }
+
+  void _restartScan() {
+    setState(() {
+      _scanKey++;
+      _detectedPlate = null;
+      _imageB64 = null;
+      _scanFailed = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: math.min(MediaQuery.of(context).size.width - 32, 520),
+        height: 460,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              WebPlateScannerWidget(
+                key: ValueKey(_scanKey),
+                onCapture: _onPlateCaptured,
+                onError: () {},
+                autoScan: true,
+                gate: widget.gateMode,
+              ),
+              if (_detectedPlate != null) ...[
+                Container(color: Colors.black54),
+                Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    if (_imageB64 != null) ...[
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          base64Decode(_imageB64!),
+                          height: 80,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    const Icon(Icons.check_circle, color: Colors.green, size: 40),
+                    const SizedBox(height: 8),
+                    const Text('Plaque détectée',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(_detectedPlate!,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              letterSpacing: 1)),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F172A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => widget.onVerify(_detectedPlate!),
+                      icon: const Icon(Icons.shield, size: 18),
+                      label: const Text('Vérifier l\'accès',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _restartScan,
+                      child: const Text('Nouveau scan',
+                          style: TextStyle(color: Colors.white70)),
+                    ),
+                  ]),
+                ),
+              ],
+              if (_scanFailed) ...[
+                Container(color: Colors.black54),
+                Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.videocam_off, color: Colors.orange, size: 40),
+                    const SizedBox(height: 12),
+                    const Text('Aucune plaque détectée',
+                        style: TextStyle(color: Colors.white, fontSize: 14)),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _restartScan,
+                      child: const Text('Réessayer'),
+                    ),
+                  ]),
+                ),
+              ],
+              Positioned(
+                top: 12,
+                right: 12,
+                child: GestureDetector(
+                  onTap: widget.onClose,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlateGuidePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rw = size.width * 0.78;
+    final rh = rw * 0.30;
+    final l = (size.width - rw) / 2;
+    final t = (size.height - rh) / 2;
+
+    final overlay = Paint()..color = Colors.black54;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, t), overlay);
+    canvas.drawRect(Rect.fromLTWH(0, t + rh, size.width, size.height - t - rh), overlay);
+    canvas.drawRect(Rect.fromLTWH(0, t, l, rh), overlay);
+    canvas.drawRect(Rect.fromLTWH(l + rw, t, size.width - l - rw, rh), overlay);
+
+    final corner = Paint()
+      ..color = Colors.greenAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    const cl = 24.0;
+    canvas.drawLine(Offset(l, t + cl), Offset(l, t), corner);
+    canvas.drawLine(Offset(l, t), Offset(l + cl, t), corner);
+    canvas.drawLine(Offset(l + rw - cl, t), Offset(l + rw, t), corner);
+    canvas.drawLine(Offset(l + rw, t), Offset(l + rw, t + cl), corner);
+    canvas.drawLine(Offset(l + rw, t + rh - cl), Offset(l + rw, t + rh), corner);
+    canvas.drawLine(Offset(l + rw, t + rh), Offset(l + rw - cl, t + rh), corner);
+    canvas.drawLine(Offset(l + cl, t + rh), Offset(l, t + rh), corner);
+    canvas.drawLine(Offset(l, t + rh), Offset(l, t + rh - cl), corner);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
 }

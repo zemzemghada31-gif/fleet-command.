@@ -10,6 +10,7 @@ import '../services/sync_service.dart';
 
 // Conditional import: web QR scanner on web, stub on native
 import '../widgets/qr_scanner_stub.dart' if (dart.library.html) '../widgets/web_qr_scanner.dart';
+import 'dart:math' as math;
 
 // ---------------------------------------------------------------------------
 // Models
@@ -66,6 +67,8 @@ class DevicesPage extends StatefulWidget {
 
 class _DevicesPageState extends State<DevicesPage> {
   List<DeviceModel> _devices = [];
+  List<DeviceModel> _trashDevices = [];
+  bool _showTrash = false;
   bool _isLoading = true;
   bool _isRegistering = false;
   bool _backendOffline = false;
@@ -116,7 +119,9 @@ class _DevicesPageState extends State<DevicesPage> {
   @override
   void initState() {
     super.initState();
-    _loadDevicesFromLocal();
+    _loadDevicesFromLocal().then((_) {
+      _fetchDevices();
+    });
   }
 
   @override
@@ -203,6 +208,14 @@ class _DevicesPageState extends State<DevicesPage> {
     } catch (_) {}
   }
 
+  Future<void> _saveTrashLocally(List<DeviceModel> devices) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = devices.map((d) => d.toJson()).toList();
+      await prefs.setString('cached_devices_trash', json.encode(jsonList));
+    } catch (_) {}
+  }
+
   Future<void> _loadDevicesFromLocal() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -211,9 +224,16 @@ class _DevicesPageState extends State<DevicesPage> {
         final list = (json.decode(data) as List).map((e) => DeviceModel.fromJson(e)).toList();
         if (mounted) {
           setState(() { _devices = list; _isLoading = false; _backendOffline = true; });
-          return;
         }
       }
+      final trashData = prefs.getString('cached_devices_trash');
+      if (trashData != null) {
+        final trashList = (json.decode(trashData) as List).map((e) => DeviceModel.fromJson(e)).toList();
+        if (mounted) {
+          setState(() => _trashDevices = trashList);
+        }
+      }
+      return;
     } catch (_) {}
     if (mounted) _fallbackToMock();
   }
@@ -292,12 +312,18 @@ class _DevicesPageState extends State<DevicesPage> {
   }
 
   Future<void> _deleteDevice(String deviceId) async {
+    final deleted = _devices.firstWhere((d) => d.id == deviceId,
+        orElse: () => DeviceModel(id: '', model: '', assignment: '', lastConnection: '', statusColor: ''));
+
     if (_backendOffline) {
-      // Queue for sync when backend comes back online
       await SyncService.addOperation(SyncOperationType.deleteDevice, {'deviceId': deviceId});
-      setState(() => _devices.removeWhere((d) => d.id == deviceId));
+      setState(() {
+        _devices.removeWhere((d) => d.id == deviceId);
+        _trashDevices.add(deleted);
+      });
       await _saveDevicesLocally(_devices);
-      _showSnack('Device "$deviceId" removed (will sync when online).');
+      await _saveTrashLocally(_trashDevices);
+      _showSnack('Device "$deviceId" moved to trash (will sync when online).');
       return;
     }
     try {
@@ -306,22 +332,62 @@ class _DevicesPageState extends State<DevicesPage> {
           .timeout(const Duration(seconds: 30));
       if (!mounted) return;
       if (res.statusCode == 200) {
-        setState(() => _devices.removeWhere((d) => d.id == deviceId));
+        setState(() {
+          _devices.removeWhere((d) => d.id == deviceId);
+          _trashDevices.add(deleted);
+        });
         await _saveDevicesLocally(_devices);
-        _showSnack('Device "$deviceId" deleted.');
+        await _saveTrashLocally(_trashDevices);
+        _showSnack('Device "$deviceId" moved to trash.');
       } else {
         _showSnack('Delete failed.', isError: true);
       }
     } catch (_) {
       if (!mounted) return;
-      // Queue for sync when backend comes back online
       await SyncService.addOperation(SyncOperationType.deleteDevice, {'deviceId': deviceId});
       setState(() {
         _devices.removeWhere((d) => d.id == deviceId);
+        _trashDevices.add(deleted);
         _backendOffline = true;
       });
       await _saveDevicesLocally(_devices);
-      _showSnack('Deleted locally (queued for sync).');
+      await _saveTrashLocally(_trashDevices);
+      _showSnack('Moved to trash locally (queued for sync).');
+    }
+  }
+
+  Future<void> _fetchTrashDevices() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$kApiBaseUrl/api/devices/trash'))
+          .timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        final list = (json.decode(res.body) as List).map((e) => DeviceModel.fromJson(e)).toList();
+        setState(() => _trashDevices = list);
+        await _saveTrashLocally(list);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _restoreDevice(String deviceId) async {
+    try {
+      final res = await http
+          .post(Uri.parse('$kApiBaseUrl/api/devices/${Uri.encodeComponent(deviceId)}/restore'))
+          .timeout(const Duration(seconds: 30));
+      if (!mounted) return;
+      if (res.statusCode == 200) {
+        setState(() {
+          _trashDevices.removeWhere((d) => d.id == deviceId);
+        });
+        await _saveTrashLocally(_trashDevices);
+        _showSnack('Device "$deviceId" restored.');
+        _fetchDevices();
+      } else {
+        _showSnack('Restore failed.', isError: true);
+      }
+    } catch (_) {
+      if (mounted) _showSnack('Backend unreachable.', isError: true);
     }
   }
 
@@ -433,7 +499,7 @@ class _DevicesPageState extends State<DevicesPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           contentPadding: EdgeInsets.zero,
           content: SizedBox(
-            width: 400,
+            width: math.min(MediaQuery.of(context).size.width - 32, 400),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -562,7 +628,7 @@ class _DevicesPageState extends State<DevicesPage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           contentPadding: EdgeInsets.zero,
           content: SizedBox(
-            width: 400,
+            width: math.min(MediaQuery.of(context).size.width - 32, 400),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -724,24 +790,41 @@ class _DevicesPageState extends State<DevicesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(isMobile ? 12 : 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Offline banner
           if (_backendOffline) _buildOfflineBanner(),
-          // Top row: form + map
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 1, child: _buildRegisterCard()),
-              const SizedBox(width: 32),
-              Expanded(flex: 2, child: _buildMapCard()),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 700;
+              if (isWide) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 1, child: _buildRegisterCard()),
+                    const SizedBox(width: 32),
+                    Expanded(flex: 2, child: _buildMapCard()),
+                  ],
+                );
+              } else {
+                return Column(
+                  children: [
+                    _buildRegisterCard(),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: isMobile ? 280 : 380,
+                      child: _buildMapCard(),
+                    ),
+                  ],
+                );
+              }
+            },
           ),
-          const SizedBox(height: 32),
-          _buildInventoryTable(),
+          SizedBox(height: isMobile ? 16 : 32),
+          _buildInventoryTable(isMobile),
         ],
       ),
     );
@@ -1017,81 +1100,186 @@ class _DevicesPageState extends State<DevicesPage> {
   // Inventory table
   // ---------------------------------------------------------------------------
 
-  Widget _buildInventoryTable() {
+  Widget _buildInventoryTable([bool isMobile = false]) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 12 : 24),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Device Inventory', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                Text(
-                  '${_filtered.length} device${_filtered.length == 1 ? '' : 's'}'
-                  '${_filterAssignment != null ? ' · filtered: $_filterAssignment' : ''}',
-                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+          isMobile
+              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Device Inventory', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    Text(
+                      _showTrash
+                          ? '${_trashDevices.length} deleted device${_trashDevices.length == 1 ? '' : 's'}'
+                          : '${_filtered.length} device${_filtered.length == 1 ? '' : 's'}'
+                              '${_filterAssignment != null ? ' · filtered: $_filterAssignment' : ''}',
+                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(children: [
+                      _buildTableButton(_showTrash ? 'Active' : 'Trash', _showTrash ? Icons.devices : Icons.delete_outline, onTap: () { setState(() => _showTrash = !_showTrash); if (_showTrash) _fetchTrashDevices(); }),
+                      const SizedBox(width: 8),
+                      _buildTableButton('Filter', Icons.tune, onTap: _openFilterDialog),
+                      const SizedBox(width: 8),
+                      _buildTableButton('Export CSV', Icons.download, onTap: _exportCsv),
+                      const SizedBox(width: 8),
+                      _buildTableButton('Refresh', Icons.refresh, onTap: _showTrash ? _fetchTrashDevices : _fetchDevices),
+                    ]),
+                  ),
+                ])
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Device Inventory', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      Text(
+                        _showTrash
+                            ? '${_trashDevices.length} deleted device${_trashDevices.length == 1 ? '' : 's'}'
+                            : '${_filtered.length} device${_filtered.length == 1 ? '' : 's'}'
+                                '${_filterAssignment != null ? ' · filtered: $_filterAssignment' : ''}',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      ),
+                    ]),
+                    Row(children: [
+                      _buildTableButton(_showTrash ? 'Active' : 'Trash', _showTrash ? Icons.devices : Icons.delete_outline, onTap: () { setState(() => _showTrash = !_showTrash); if (_showTrash) _fetchTrashDevices(); }),
+                      const SizedBox(width: 12),
+                      _buildTableButton('Filter', Icons.tune, onTap: _openFilterDialog),
+                      const SizedBox(width: 12),
+                      _buildTableButton('Export CSV', Icons.download, onTap: _exportCsv),
+                      const SizedBox(width: 12),
+                      _buildTableButton('Refresh', Icons.refresh, onTap: _showTrash ? _fetchTrashDevices : _fetchDevices),
+                    ]),
+                  ],
                 ),
-              ]),
-              Row(children: [
-                _buildTableButton('Filter', Icons.tune, onTap: _openFilterDialog),
-                const SizedBox(width: 12),
-                _buildTableButton('Export CSV', Icons.download, onTap: _exportCsv),
-                const SizedBox(width: 12),
-                _buildTableButton('Refresh', Icons.refresh, onTap: _fetchDevices),
-              ]),
-            ],
-          ),
           const SizedBox(height: 24),
 
-          // Table header
-          _buildTableHeader(),
-          const Divider(color: Color(0xFFF1F5F9)),
-
-          // Rows
-          if (_isLoading)
-            const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
-          else if (_paged.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 32),
-              child: Center(child: Text('No devices found.', style: TextStyle(color: Color(0xFF94A3B8)))),
-            )
-          else
-            ..._paged.map((d) => Column(
-                  children: [
-                    _buildTableRow(d),
-                    const Divider(color: Color(0xFFF8FAFC), height: 1),
-                  ],
-                )),
+          isMobile
+              ? Column(children: [
+                  if (_isLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+                  else if (_showTrash && _trashDevices.isEmpty)
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Center(child: Text('Trash is empty.', style: TextStyle(color: Color(0xFF94A3B8)))))
+                  else if (!_showTrash && _paged.isEmpty)
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Center(child: Text('No devices found.', style: TextStyle(color: Color(0xFF94A3B8)))))
+                  else if (_showTrash)
+                    ..._trashDevices.map((d) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildMobileTrashCard(d)))
+                  else
+                    ..._paged.map((d) => Padding(padding: const EdgeInsets.only(bottom: 8), child: _buildMobileDeviceCard(d))),
+                ])
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _buildTableHeader(),
+                  const Divider(color: Color(0xFFF1F5F9)),
+                  if (_isLoading)
+                    const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+                  else if (_showTrash && _trashDevices.isEmpty)
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Center(child: Text('Trash is empty.', style: TextStyle(color: Color(0xFF94A3B8)))))
+                  else if (!_showTrash && _paged.isEmpty)
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 32), child: Center(child: Text('No devices found.', style: TextStyle(color: Color(0xFF94A3B8)))))
+                  else if (_showTrash)
+                    ..._trashDevices.map((d) => Column(children: [_buildTrashRow(d), const Divider(color: Color(0xFFF8FAFC), height: 1)]))
+                  else
+                    ..._paged.map((d) => Column(children: [_buildTableRow(d), const Divider(color: Color(0xFFF8FAFC), height: 1)])),
+                ]),
 
           const SizedBox(height: 20),
 
           // Pagination
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
             children: [
-              Text(
-                'Page $_currentPage of $_totalPages  (${_filtered.length} total)',
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-              ),
-              Row(children: [
-                _buildPageButton(Icons.chevron_left,
-                    isEnabled: _currentPage > 1,
-                    onTap: () => setState(() => _currentPage--)),
-                ...List.generate(_totalPages.clamp(0, 5), (i) => _buildPageNumber(
-                    '${i + 1}', isSelected: _currentPage == i + 1,
-                    onTap: () => setState(() => _currentPage = i + 1))),
-                _buildPageButton(Icons.chevron_right,
-                    isEnabled: _currentPage < _totalPages,
-                    onTap: () => setState(() => _currentPage++)),
+              Text('Page $_currentPage of $_totalPages  (${_filtered.length} total)', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                _buildPageButton(Icons.chevron_left, isEnabled: _currentPage > 1, onTap: () => setState(() => _currentPage--)),
+                ...List.generate(_totalPages.clamp(0, 5), (i) => _buildPageNumber('${i + 1}', isSelected: _currentPage == i + 1, onTap: () => setState(() => _currentPage = i + 1))),
+                _buildPageButton(Icons.chevron_right, isEnabled: _currentPage < _totalPages, onTap: () => setState(() => _currentPage++)),
               ]),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMobileDeviceCard(DeviceModel d) {
+    final badgeColor = _statusBadgeColor(d.assignment);
+    final badgeBg = _statusBadgeBg(d.assignment);
+    final isAssigned = d.assignment == 'ASSIGNED';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(d.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8), size: 20),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            onSelected: (action) => _handleDeviceAction(action, d),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'assign',      child: _PopupItem(Icons.link,              'Set ASSIGNED',    Color(0xFF3B82F6))),
+              const PopupMenuItem(value: 'unassign',    child: _PopupItem(Icons.link_off,           'Set UNASSIGNED',  Color(0xFF64748B))),
+              const PopupMenuItem(value: 'maintenance', child: _PopupItem(Icons.build,              'Set MAINTENANCE', Color(0xFFF59E0B))),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'delete',      child: _PopupItem(Icons.delete_outline,     'Delete Device',   Colors.red)),
+            ],
+          ),
+        ]),
+        const SizedBox(height: 6),
+        Text(d.model, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+        const SizedBox(height: 8),
+        Row(children: [
+          if (isAssigned) ...[
+            const Icon(Icons.directions_car, size: 13, color: Color(0xFF3B82F6)),
+            const SizedBox(width: 4),
+            Expanded(child: Text(d.assignedVehicle, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 12), overflow: TextOverflow.ellipsis)),
+            const SizedBox(width: 8),
+          ] else ...[
+            Expanded(child: Text(d.assignedVehicle, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12))),
+            const SizedBox(width: 8),
+          ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(6)),
+            child: Text(d.assignment, style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.bold)),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        Row(children: [
+          const Icon(Icons.schedule, size: 12, color: Color(0xFF94A3B8)),
+          const SizedBox(width: 4),
+          Text(isAssigned ? d.assignedSince : '—', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildMobileTrashCard(DeviceModel d) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(d.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFEF4444))),
+          Text('${d.model} · ${d.assignedVehicle}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+        ])),
+        IconButton(
+          icon: const Icon(Icons.restore_from_trash, color: Color(0xFF3B82F6), size: 20),
+          tooltip: 'Restore',
+          onPressed: () => _restoreDevice(d.id),
+        ),
+      ]),
     );
   }
 
@@ -1154,7 +1342,7 @@ class _DevicesPageState extends State<DevicesPage> {
                     children: [
                       const Icon(Icons.schedule, size: 14, color: Color(0xFF64748B)),
                       const SizedBox(width: 6),
-                      Text(d.assignedSince, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+                      Expanded(child: Text(d.assignedSince, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12))),
                     ],
                   )
                 : Text(d.assignedSince, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
@@ -1185,6 +1373,39 @@ class _DevicesPageState extends State<DevicesPage> {
                 const PopupMenuDivider(),
                 const PopupMenuItem(value: 'delete',      child: _PopupItem(Icons.delete_outline,     'Delete Device',   Colors.red)),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrashRow(DeviceModel d) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: Row(
+            children: [
+              const Icon(Icons.delete_outline, size: 14, color: Color(0xFFEF4444)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(d.id, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFEF4444)))),
+            ],
+          )),
+          Expanded(flex: 1, child: Text(d.model, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13))),
+          Expanded(flex: 2, child: Text(d.assignedVehicle, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12))),
+          Expanded(flex: 2, child: Text(d.assignedSince, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+          Expanded(flex: 1, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(6)),
+            child: const Text('DELETED', style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold)),
+          )),
+          SizedBox(
+            width: 60,
+            child: IconButton(
+              icon: const Icon(Icons.restore_from_trash, color: Color(0xFF3B82F6), size: 20),
+              tooltip: 'Restore',
+              onPressed: () => _restoreDevice(d.id),
             ),
           ),
         ],
@@ -1231,7 +1452,7 @@ class _DevicesPageState extends State<DevicesPage> {
           Text('Export CSV'),
         ]),
         content: SizedBox(
-          width: 440, height: 220,
+          width: math.min(440, MediaQuery.of(context).size.width - 48), height: 220,
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8)),

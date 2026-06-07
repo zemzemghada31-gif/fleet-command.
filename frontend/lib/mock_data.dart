@@ -1,4 +1,4 @@
-// ignore_for_file: unnecessary_const, prefer_const_constructors
+﻿// ignore_for_file: unnecessary_const, prefer_const_constructors
 import 'dart:math';
 import 'package:flutter/painting.dart';
 import 'package:latlong2/latlong.dart';
@@ -40,13 +40,13 @@ class MockVehicle {
 }
 
 const List<MockVehicle> kMockVehicles = [
-  MockVehicle(id: 1, model: 'Mercedes-Benz Actros',   plate: 'BT-904-TX', status: 'ACTIVE',     tracker: 'X-9941-ALPHA', lat: 41.8781, lng: -87.6298, speed: 68, fuel: 92, driver: 'Marcus Reed',   eta: '4.2H TO GO', heading: 'NE'),
-  MockVehicle(id: 2, model: 'Scania R-Series',        plate: 'CA-123-VN', status: 'MAINTENANCE', tracker: 'X-7703-GAMMA', lat: 37.3382, lng: -121.8863, speed: 0,  fuel: 44, driver: 'Sarah Kim',     eta: 'OFFLOADING',  heading: '—'),
-  MockVehicle(id: 3, model: 'Volvo FH',               plate: 'TX-4409-LP',status: 'IDLE',       tracker: 'X-1001-BETA',  lat: 37.7749, lng: -122.4194, speed: 0,  fuel: 88, driver: 'Kevin Park',    eta: 'LOADING',     heading: '—'),
-  MockVehicle(id: 4, model: 'MAN TGX',                plate: 'ZZ-123-ZZ', status: 'ACTIVE',     tracker: 'X-7705-EPSILON', lat: 48.8566, lng: 2.3522, speed: 45, fuel: 76, driver: 'Pierre Dubois', eta: '2.1H TO GO', heading: 'SE'),
-  MockVehicle(id: 5, model: 'DAF XF',                 plate: 'PY-456-RT', status: 'ACTIVE',     tracker: 'X-8821-GAMMA', lat: 45.7640, lng: 4.8357, speed: 52, fuel: 61, driver: 'Marie Laurent', eta: '1.8H TO GO', heading: 'SW'),
-  MockVehicle(id: 6, model: 'Renault Trucks T',       plate: 'CI-789-YU', status: 'IDLE',       tracker: 'X-8824-ZETA',  lat: 43.6047, lng: 1.4442, speed: 0,  fuel: 95, driver: 'Jean Moreau',   eta: '—',          heading: '—'),
-  MockVehicle(id: 7, model: 'Mercedes-Benz Arocs',    plate: 'VB-101-PO', status: 'MAINTENANCE', tracker: 'X-7701-ALPHA', lat: 52.5200, lng: 13.4050, speed: 0,  fuel: 33, driver: 'Hans Schmidt',  eta: 'OFFLOADING',  heading: '—'),
+  MockVehicle(id: 1, model: 'Mercedes-Benz Actros',   plate: '123-TUN-45', status: 'ACTIVE',     tracker: 'X-9941-ALPHA', lat: 41.8781, lng: -87.6298, speed: 68, fuel: 92, driver: 'Marcus Reed',   eta: '4.2H TO GO', heading: 'NE'),
+  MockVehicle(id: 2, model: 'Scania R-Series',        plate: '456-NBL-78', status: 'MAINTENANCE', tracker: 'X-7703-GAMMA', lat: 37.3382, lng: -121.8863, speed: 0,  fuel: 44, driver: 'Sarah Kim',     eta: 'OFFLOADING',  heading: '—'),
+  MockVehicle(id: 3, model: 'Volvo FH',               plate: '789-SF-01',status: 'IDLE',       tracker: 'X-1001-BETA',  lat: 37.7749, lng: -122.4194, speed: 0,  fuel: 88, driver: 'Kevin Park',    eta: 'LOADING',     heading: '—'),
+  MockVehicle(id: 4, model: 'MAN TGX',                plate: '111-ARI-22', status: 'ACTIVE',     tracker: 'X-7705-EPSILON', lat: 48.8566, lng: 2.3522, speed: 45, fuel: 76, driver: 'Pierre Dubois', eta: '2.1H TO GO', heading: 'SE'),
+  MockVehicle(id: 5, model: 'DAF XF',                 plate: '333-BEN-44', status: 'ACTIVE',     tracker: 'X-8821-GAMMA', lat: 45.7640, lng: 4.8357, speed: 52, fuel: 61, driver: 'Marie Laurent', eta: '1.8H TO GO', heading: 'SW'),
+  MockVehicle(id: 6, model: 'Renault Trucks T',       plate: '555-MON-66', status: 'IDLE',       tracker: 'X-8824-ZETA',  lat: 43.6047, lng: 1.4442, speed: 0,  fuel: 95, driver: 'Jean Moreau',   eta: '—',          heading: '—'),
+  MockVehicle(id: 7, model: 'Mercedes-Benz Arocs',    plate: '777-SUS-88', status: 'MAINTENANCE', tracker: 'X-7701-ALPHA', lat: 52.5200, lng: 13.4050, speed: 0,  fuel: 33, driver: 'Hans Schmidt',  eta: 'OFFLOADING',  heading: '—'),
   MockVehicle(id: 8, model: 'Scania G-Series',        plate: 'FI-202-IK', status: 'ACTIVE',     tracker: 'X-1005-ZETA',  lat: 41.9028, lng: 12.4964, speed: 71, fuel: 84, driver: 'Luigi Rossi',   eta: '3.5H TO GO', heading: 'NE'),
   MockVehicle(id: 9, model: 'Volvo FM',               plate: 'NN-303-LP', status: 'ACTIVE',     tracker: 'X-8822-DELTA', lat: 35.6762, lng: 139.6503, speed: 48, fuel: 67, driver: 'Yuki Tanaka',   eta: '5.1H TO GO', heading: 'E'),
   MockVehicle(id: 10, model: 'MAN TGS',               plate: 'TY-404-ER', status: 'IDLE',       tracker: 'X-8827-KAPPA', lat: 51.5074, lng: -0.1278, speed: 0,  fuel: 91, driver: 'James Wilson',  eta: '—',          heading: '—'),
@@ -78,8 +78,8 @@ class MockDevice {
 }
 
 const List<MockDevice> kMockDevices = [
-  MockDevice(id: 'X-9941-ALPHA', model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '2 mins ago',  statusColor: '0xFF3B82F6', assignedVehicle: 'Mercedes-Benz Actros (BT-904-TX)',   assignedSince: '2025-03-10 14:30'),
-  MockDevice(id: 'X-1001-BETA',  model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '5 mins ago',  statusColor: '0xFF3B82F6', assignedVehicle: 'Volvo FH (TX-4409-LP)',              assignedSince: '2025-04-01 09:15'),
+  MockDevice(id: 'X-9941-ALPHA', model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '2 mins ago',  statusColor: '0xFF3B82F6', assignedVehicle: 'Mercedes-Benz Actros (123-TUN-45)',   assignedSince: '2025-03-10 14:30'),
+  MockDevice(id: 'X-1001-BETA',  model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '5 mins ago',  statusColor: '0xFF3B82F6', assignedVehicle: 'Volvo FH (789-SF-01)',              assignedSince: '2025-04-01 09:15'),
   MockDevice(id: 'X-1002-GAMMA', model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '12 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'Renault Trucks D (FR-4401-P)',       assignedSince: '2025-02-18 11:00'),
   MockDevice(id: 'X-1003-DELTA', model: 'Apex Tracker V3',  assignment: 'UNASSIGNED',  lastConnection: '1 hr ago',    statusColor: '0xFF64748B'),
   MockDevice(id: 'X-1004-EPSILON', model: 'Apex Tracker V3',assignment: 'MAINTENANCE', lastConnection: '3 days ago',  statusColor: '0xFFF59E0B'),
@@ -89,18 +89,18 @@ const List<MockDevice> kMockDevices = [
   MockDevice(id: 'X-1008-KAPPA', model: 'Apex Tracker V3',  assignment: 'ASSIGNED',    lastConnection: '1 min ago',   statusColor: '0xFF3B82F6', assignedVehicle: 'Iveco S-Way (HY-505-UI)',             assignedSince: '2025-03-28 13:20'),
   MockDevice(id: 'X-1009-LAMBDA',model: 'Apex Tracker V3',  assignment: 'MAINTENANCE', lastConnection: '1 week ago',  statusColor: '0xFFF59E0B'),
   MockDevice(id: 'X-8820-BETA',  model: 'Core Link Hub',    assignment: 'UNASSIGNED',  lastConnection: '14 hrs ago',  statusColor: '0xFF64748B'),
-  MockDevice(id: 'X-8821-GAMMA', model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: '3 mins ago',  statusColor: '0xFF3B82F6', assignedVehicle: 'DAF XF (PY-456-RT)',                 assignedSince: '2025-01-15 10:30'),
+  MockDevice(id: 'X-8821-GAMMA', model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: '3 mins ago',  statusColor: '0xFF3B82F6', assignedVehicle: 'DAF XF (333-BEN-44)',                 assignedSince: '2025-01-15 10:30'),
   MockDevice(id: 'X-8822-DELTA', model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: '45 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'Volvo FM (NN-303-LP)',               assignedSince: '2025-04-10 07:00'),
   MockDevice(id: 'X-8823-EPSILON',model: 'Core Link Hub',   assignment: 'MAINTENANCE', lastConnection: '2 days ago',  statusColor: '0xFFF59E0B'),
-  MockDevice(id: 'X-8824-ZETA',  model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: '10 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'Renault Trucks T (CI-789-YU)',       assignedSince: '2025-05-05 12:00'),
+  MockDevice(id: 'X-8824-ZETA',  model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: '10 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'Renault Trucks T (555-MON-66)',       assignedSince: '2025-05-05 12:00'),
   MockDevice(id: 'X-8825-THETA', model: 'Core Link Hub',    assignment: 'UNASSIGNED',  lastConnection: '8 hrs ago',   statusColor: '0xFF64748B'),
   MockDevice(id: 'X-8826-IOTA',  model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: 'Just now',    statusColor: '0xFF3B82F6', assignedVehicle: 'Ford F-MAX (FR-606-TY)',              assignedSince: '2025-04-18 09:30'),
   MockDevice(id: 'X-8827-KAPPA', model: 'Core Link Hub',    assignment: 'ASSIGNED',    lastConnection: '25 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'MAN TGS (TY-404-ER)',                assignedSince: '2025-03-05 14:15'),
-  MockDevice(id: 'X-7701-ALPHA', model: 'Nano Sensor X1',   assignment: 'ASSIGNED',    lastConnection: '15 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'Mercedes-Benz Arocs (VB-101-PO)',     assignedSince: '2025-02-28 16:00'),
+  MockDevice(id: 'X-7701-ALPHA', model: 'Nano Sensor X1',   assignment: 'ASSIGNED',    lastConnection: '15 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'Mercedes-Benz Arocs (777-SUS-88)',     assignedSince: '2025-02-28 16:00'),
   MockDevice(id: 'X-7702-BETA',  model: 'Nano Sensor X1',   assignment: 'UNASSIGNED',  lastConnection: '6 hrs ago',   statusColor: '0xFF64748B'),
-  MockDevice(id: 'X-7703-GAMMA', model: 'Nano Sensor X1',   assignment: 'ASSIGNED',    lastConnection: '1 min ago',   statusColor: '0xFF3B82F6', assignedVehicle: 'Scania R-Series (CA-123-VN)',         assignedSince: '2025-04-29 11:45'),
+  MockDevice(id: 'X-7703-GAMMA', model: 'Nano Sensor X1',   assignment: 'ASSIGNED',    lastConnection: '1 min ago',   statusColor: '0xFF3B82F6', assignedVehicle: 'Scania R-Series (456-NBL-78)',         assignedSince: '2025-04-29 11:45'),
   MockDevice(id: 'X-7704-DELTA', model: 'Nano Sensor X1',   assignment: 'MAINTENANCE', lastConnection: '4 days ago',  statusColor: '0xFFF59E0B'),
-  MockDevice(id: 'X-7705-EPSILON',model: 'Nano Sensor X1',  assignment: 'ASSIGNED',    lastConnection: '20 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'MAN TGX (ZZ-123-ZZ)',                assignedSince: '2025-05-08 10:00'),
+  MockDevice(id: 'X-7705-EPSILON',model: 'Nano Sensor X1',  assignment: 'ASSIGNED',    lastConnection: '20 mins ago', statusColor: '0xFF3B82F6', assignedVehicle: 'MAN TGX (111-ARI-22)',                assignedSince: '2025-05-08 10:00'),
   MockDevice(id: 'X-7706-ZETA',  model: 'Nano Sensor X1',   assignment: 'ASSIGNED',    lastConnection: 'Just now',    statusColor: '0xFF3B82F6', assignedVehicle: 'Renault Trucks D (FR-4401-P)',        assignedSince: '2025-04-12 08:30'),
 ];
 
@@ -279,7 +279,7 @@ class MockRoute {
 }
 
 final Map<String, MockRoute> kMockRoutes = {
-  'BT-904-TX': const MockRoute(
+  '123-TUN-45': const MockRoute(
     points: [
       const LatLng(40.7128, -74.0060), const LatLng(40.7580, -73.9855),
       const LatLng(40.7890, -74.1250), const LatLng(40.8500, -74.2000),
@@ -296,7 +296,7 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(40.7890, -74.1250), to: const LatLng(41.8781, -87.6298), fromCity: 'Parsippany, NJ', toCity: 'Chicago, IL', date: '2026-05-07', time: '09:33', distance: '795 mi', duration: '12 h 27 min', hasWarning: true),
     ],
   ),
-  'CA-123-VN': const MockRoute(
+  '456-NBL-78': const MockRoute(
     points: [
       const LatLng(51.5074, -0.1278), const LatLng(51.8000, -0.2000),
       const LatLng(52.0000, -0.5000), const LatLng(52.5000, -1.0000),
@@ -311,7 +311,7 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(51.8000, -0.2000), to: const LatLng(55.9533, -3.1883), fromCity: 'St Albans', toCity: 'Edinburgh', date: '2026-05-06', time: '22:28', distance: '400 mi', duration: '6 h 47 min'),
     ],
   ),
-  'TX-4409-LP': const MockRoute(
+  '789-SF-01': const MockRoute(
     points: [
       const LatLng(25.2048, 55.2708), const LatLng(25.3000, 55.4000),
       const LatLng(25.4000, 55.5000), const LatLng(25.5000, 55.6000),
@@ -323,7 +323,7 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(25.3000, 55.4000), to: const LatLng(25.7000, 55.8000), fromCity: 'Sharjah', toCity: 'Fujairah', date: '2026-05-05', time: '06:18', distance: '60 mi', duration: '1 h 15 min'),
     ],
   ),
-  'ZZ-123-ZZ': MockRoute(
+  '111-ARI-22': MockRoute(
     points: [
       const LatLng(25.7617, -80.1918), const LatLng(26.5000, -80.5000),
       const LatLng(27.5000, -81.0000), const LatLng(28.5000, -81.5000),
@@ -339,7 +339,7 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(26.5000, -80.5000), to: const LatLng(37.7749, -122.4194), fromCity: 'Fort Lauderdale, FL', toCity: 'San Francisco, CA', date: '2026-05-07', time: '08:20', distance: '2550 mi', duration: '38 h', hasWarning: true),
     ],
   ),
-  'PY-456-RT': MockRoute(
+  '333-BEN-44': MockRoute(
     points: [
       const LatLng(37.7749, -122.4194), const LatLng(38.0000, -122.5000),
       const LatLng(38.5000, -122.8000), const LatLng(39.0000, -123.0000),
@@ -359,7 +359,7 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(38.0000, -122.5000), to: const LatLng(47.6062, -122.3321), fromCity: 'Novato, CA', toCity: 'Seattle, WA', date: '2026-05-06', time: '08:25', distance: '800 mi', duration: '12 h 35 min'),
     ],
   ),
-  'CI-789-YU': MockRoute(
+  '555-MON-66': MockRoute(
     points: [
       const LatLng(29.7604, -95.3698), const LatLng(30.0000, -95.5000),
       const LatLng(30.5000, -96.0000), const LatLng(31.0000, -96.5000),
@@ -379,7 +379,7 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(32.0000, -97.5000), to: const LatLng(39.7392, -104.9903), fromCity: 'Waco, TX', toCity: 'Denver, CO', date: '2026-05-06', time: '17:00', distance: '800 mi', duration: '12 h'),
     ],
   ),
-  'VB-101-PO': MockRoute(
+  '777-SUS-88': MockRoute(
     points: [
       const LatLng(52.5200, 13.4050), const LatLng(52.5365, 13.3850),
       const LatLng(53.0793, 8.8017), const LatLng(51.2277, 6.7735),
@@ -431,27 +431,71 @@ final Map<String, MockRoute> kMockRoutes = {
       const RouteSegment(from: const LatLng(51.4816, -3.1791), to: const LatLng(53.4084, -2.9916), fromCity: 'Cardiff', toCity: 'Liverpool', date: '2026-05-05', time: '14:00', distance: '140 mi', duration: '3 h', hasWarning: true),
     ],
   ),
+  'HY-505-UI': MockRoute(
+    points: [
+      const LatLng(37.5665, 126.9780), const LatLng(37.0000, 127.0000),
+      const LatLng(35.1796, 129.0756),
+    ],
+    cityNames: ['Seoul, SK', 'Cheongju, SK', 'Busan, SK'],
+    segments: [
+      const RouteSegment(from: const LatLng(37.5665, 126.9780), to: const LatLng(37.0000, 127.0000), fromCity: 'Seoul, SK', toCity: 'Cheongju, SK', date: '2026-05-07', time: '07:00', distance: '80 mi', duration: '2 h 30 min'),
+      const RouteSegment(from: const LatLng(37.0000, 127.0000), to: const LatLng(35.1796, 129.0756), fromCity: 'Cheongju, SK', toCity: 'Busan, SK', date: '2026-05-07', time: '10:00', distance: '150 mi', duration: '4 h 30 min'),
+    ],
+  ),
+  'FR-606-TY': MockRoute(
+    points: [
+      const LatLng(-33.8688, 151.2093), const LatLng(-33.8680, 150.0000),
+      const LatLng(-34.9285, 138.6007),
+    ],
+    cityNames: ['Sydney, AU', 'Canberra, AU', 'Adelaide, AU'],
+    segments: [
+      const RouteSegment(from: const LatLng(-33.8688, 151.2093), to: const LatLng(-33.8680, 150.0000), fromCity: 'Sydney, AU', toCity: 'Canberra, AU', date: '2026-05-06', time: '06:00', distance: '180 mi', duration: '2 h 30 min'),
+      const RouteSegment(from: const LatLng(-33.8680, 150.0000), to: const LatLng(-34.9285, 138.6007), fromCity: 'Canberra, AU', toCity: 'Adelaide, AU', date: '2026-05-06', time: '09:00', distance: '730 mi', duration: '7 h 00 min', hasWarning: true),
+    ],
+  ),
+  'CO-7710-D': MockRoute(
+    points: [
+      const LatLng(39.7392, -104.9903), const LatLng(39.0000, -105.0000),
+      const LatLng(38.2527, -85.7585),
+    ],
+    cityNames: ['Denver, CO', 'Colorado Springs, CO', 'Louisville, KY'],
+    segments: [
+      const RouteSegment(from: const LatLng(39.7392, -104.9903), to: const LatLng(39.0000, -105.0000), fromCity: 'Denver, CO', toCity: 'Colorado Springs, CO', date: '2026-05-07', time: '08:00', distance: '70 mi', duration: '2 h 00 min'),
+      const RouteSegment(from: const LatLng(39.0000, -105.0000), to: const LatLng(38.2527, -85.7585), fromCity: 'Colorado Springs, CO', toCity: 'Louisville, KY', date: '2026-05-07', time: '10:30', distance: '850 mi', duration: '8 h 00 min'),
+    ],
+  ),
+  'FR-4401-P': MockRoute(
+    points: [
+      const LatLng(46.2276, 4.8126), const LatLng(46.0000, 4.5000),
+      const LatLng(45.7640, 4.8357),
+    ],
+    cityNames: ['Bourg-en-Bresse', 'Mâcon', 'Lyon'],
+    segments: [
+      const RouteSegment(from: const LatLng(46.2276, 4.8126), to: const LatLng(46.0000, 4.5000), fromCity: 'Bourg-en-Bresse', toCity: 'Mâcon', date: '2026-05-07', time: '08:00', distance: '30 mi', duration: '1 h 00 min'),
+      const RouteSegment(from: const LatLng(46.0000, 4.5000), to: const LatLng(45.7640, 4.8357), fromCity: 'Mâcon', toCity: 'Lyon', date: '2026-05-07', time: '09:30', distance: '45 mi', duration: '1 h 00 min'),
+    ],
+  ),
 };
 
-final Set<String> kIdlePlates = {'CA-123-VN', 'TX-4409-LP', 'VB-101-PO', 'TY-404-ER'};
+final Set<String> kIdlePlates = {'456-NBL-78', '789-SF-01', '777-SUS-88', 'TY-404-ER', 'FR-606-TY'};
 
 List<Map<String, dynamic>> kStopsForVehicle(String plate) {
   final stops = <String, List<Map<String, dynamic>>>{
-    'BT-904-TX': [
+    '123-TUN-45': [
       {'city': 'New York, NY', 'type': 'Départ', 'time': '08:00', 'duration': '—'},
       {'city': 'Parsippany, NJ', 'type': 'Arrêt', 'time': '09:15', 'duration': '15 min'},
       {'city': 'Scranton, PA', 'type': 'Arrêt', 'time': '10:45', 'duration': '30 min'},
       {'city': 'Chicago, IL', 'type': 'Arrivée', 'time': '22:30', 'duration': '—'},
     ],
-    'CA-123-VN': [
+    '456-NBL-78': [
       {'city': 'London', 'type': 'Départ', 'time': '22:00', 'duration': '—'},
       {'city': 'Edinburgh', 'type': 'Arrivée', 'time': '06:30', 'duration': '—'},
     ],
-    'ZZ-123-ZZ': [
+    '111-ARI-22': [
       {'city': 'Miami, FL', 'type': 'Départ', 'time': '07:45', 'duration': '—'},
       {'city': 'San Francisco, CA', 'type': 'Arrivée', 'time': '22:00', 'duration': '—'},
     ],
-    'VB-101-PO': [
+    '777-SUS-88': [
       {'city': 'Berlin', 'type': 'Départ', 'time': '06:00', 'duration': '—'},
       {'city': 'Hamburg', 'type': 'Arrêt', 'time': '09:00', 'duration': '20 min'},
       {'city': 'Düsseldorf', 'type': 'Arrêt', 'time': '14:00', 'duration': '15 min'},
@@ -475,23 +519,43 @@ List<Map<String, dynamic>> kStopsForVehicle(String plate) {
       {'city': 'Cardiff', 'type': 'Arrêt', 'time': '13:00', 'duration': '30 min'},
       {'city': 'Liverpool', 'type': 'Arrivée', 'time': '17:00', 'duration': '—'},
     ],
+    'HY-505-UI': [
+      {'city': 'Seoul, SK', 'type': 'Départ', 'time': '07:00', 'duration': '—'},
+      {'city': 'Cheongju, SK', 'type': 'Arrêt', 'time': '09:30', 'duration': '15 min'},
+      {'city': 'Busan, SK', 'type': 'Arrivée', 'time': '14:30', 'duration': '—'},
+    ],
+    'FR-606-TY': [
+      {'city': 'Sydney, AU', 'type': 'Départ', 'time': '06:00', 'duration': '—'},
+      {'city': 'Canberra, AU', 'type': 'Arrêt', 'time': '08:30', 'duration': '20 min'},
+      {'city': 'Adelaide, AU', 'type': 'Arrivée', 'time': '16:00', 'duration': '—'},
+    ],
+    'CO-7710-D': [
+      {'city': 'Denver, CO', 'type': 'Départ', 'time': '08:00', 'duration': '—'},
+      {'city': 'Colorado Springs, CO', 'type': 'Arrêt', 'time': '10:00', 'duration': '10 min'},
+      {'city': 'Louisville, KY', 'type': 'Arrivée', 'time': '18:30', 'duration': '—'},
+    ],
+    'FR-4401-P': [
+      {'city': 'Bourg-en-Bresse', 'type': 'Départ', 'time': '08:00', 'duration': '—'},
+      {'city': 'Mâcon', 'type': 'Arrêt', 'time': '09:00', 'duration': '5 min'},
+      {'city': 'Lyon', 'type': 'Arrivée', 'time': '10:30', 'duration': '—'},
+    ],
   };
   return stops[plate] ?? [];
 }
 
 List<Map<String, dynamic>> kEventsForVehicle(String plate) {
   final events = <String, List<Map<String, dynamic>>>{
-    'BT-904-TX': [
+    '123-TUN-45': [
       {'icon': 'speed', 'title': 'Excès de vitesse', 'description': 'Détecté à 158 km/h sur I-80', 'time': '14:23', 'color': const Color(0xFFEF4444)},
       {'icon': 'warning', 'title': 'Arrêt prolongé', 'description': 'Arrêt de 45 min à Scranton, PA', 'time': '10:45', 'color': const Color(0xFFF59E0B)},
     ],
-    'CA-123-VN': [
+    '456-NBL-78': [
       {'icon': 'build', 'title': 'Maintenance', 'description': 'Révision moteur programmée', 'time': '08:00', 'color': const Color(0xFFF59E0B)},
     ],
-    'ZZ-123-ZZ': [
+    '111-ARI-22': [
       {'icon': 'traffic', 'title': 'Trafic dense', 'description': 'Ralentissement sur I-10', 'time': '09:30', 'color': const Color(0xFFF59E0B)},
     ],
-    'VB-101-PO': [
+    '777-SUS-88': [
       {'icon': 'warning', 'title': 'Embouteillage A2', 'description': 'Fort trafic près de Hanovre', 'time': '11:15', 'color': const Color(0xFFF59E0B)},
     ],
     'FI-202-IK': [
@@ -502,6 +566,19 @@ List<Map<String, dynamic>> kEventsForVehicle(String plate) {
     ],
     'TY-404-ER': [
       {'icon': 'build', 'title': 'Révision freins', 'description': 'Usure détectée à Liverpool', 'time': '16:00', 'color': const Color(0xFFF59E0B)},
+    ],
+    'HY-505-UI': [
+      {'icon': 'speed', 'title': 'Excès de vitesse', 'description': '95 mph sur Gyeongbu Expressway', 'time': '12:30', 'color': const Color(0xFFEF4444)},
+      {'icon': 'warning', 'title': 'Arrêt prolongé', 'description': 'Arrêt de 30 min à Cheongju', 'time': '09:30', 'color': const Color(0xFFF59E0B)},
+    ],
+    'FR-606-TY': [
+      {'icon': 'build', 'title': 'Maintenance', 'description': 'Inspection moteur programmée', 'time': '08:00', 'color': const Color(0xFFF59E0B)},
+    ],
+    'CO-7710-D': [
+      {'icon': 'warning', 'title': 'Conditions météo', 'description': 'Tempête de neige près de Denver', 'time': '10:15', 'color': const Color(0xFFF59E0B)},
+    ],
+    'FR-4401-P': [
+      {'icon': 'check', 'title': 'Livraison effectuée', 'description': 'Colis livré à Lyon', 'time': '10:30', 'color': const Color(0xFF22C55E)},
     ],
   };
   return events[plate] ?? [];
